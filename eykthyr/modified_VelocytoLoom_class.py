@@ -1,11 +1,11 @@
+import itertools
 import logging
 import warnings
-import itertools
 from copy import deepcopy
+from typing import Any, Dict, List, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
-from typing import Dict, Any, List, Union, Tuple
 import pandas as pd
 import scipy.stats
 from numba import jit
@@ -15,37 +15,60 @@ from scipy.stats import norm as normal
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.neighbors import NearestNeighbors
-
 from velocyto.diffusion import Diffusion
-from velocyto.estimation import (colDeltaCor, colDeltaCorLog10,
-                                 colDeltaCorLog10partial, colDeltaCorpartial,
-                                 colDeltaCorSqrt, colDeltaCorSqrtpartial)
+from velocyto.estimation import (
+    colDeltaCor,
+    colDeltaCorLog10,
+    colDeltaCorLog10partial,
+    colDeltaCorpartial,
+    colDeltaCorSqrt,
+    colDeltaCorSqrtpartial,
+)
 
-from .util import _adata_to_matrix, plot_background, plot_cluster_cells_use, CONFIG, _obsm_to_matrix, _get_clustercolor_from_anndata
+from .util import (
+    CONFIG,
+    _adata_to_matrix,
+    _get_clustercolor_from_anndata,
+    _obsm_to_matrix,
+    plot_background,
+    plot_cluster_cells_use,
+)
 
 
-class modified_VelocytoLoom():
+class modified_VelocytoLoom:
     #  This class is taken from CellOracle (https://github.com/morris-lab/CellOracle)
     #  and modified for our use
-    
+
     def __init__(self):
 
         pass
 
-
-    def calculate_p_mass(self, embeddings, smooth=0.8, n_grid=40, n_neighbors=itertools.repeat(200), n_jobs=-1):
-        for i,embedding in enumerate(embeddings):
-            self.calculate_grid_arrows(embedding,smooth=0.8, steps=(n_grid, n_grid), n_neighbors=n_neighbors[i], n_jobs=-1)
+    def calculate_p_mass(
+        self,
+        embeddings,
+        smooth=0.8,
+        n_grid=40,
+        n_neighbors=itertools.repeat(200),
+        n_jobs=-1,
+    ):
+        for i, embedding in enumerate(embeddings):
+            self.calculate_grid_arrows(
+                embedding,
+                smooth=0.8,
+                steps=(n_grid, n_grid),
+                n_neighbors=n_neighbors[i],
+                n_jobs=-1,
+            )
 
     def suggest_mass_thresholds(self, n_suggestion=12, s=1, n_col=4):
 
         min_ = self.total_p_mass.min()
         max_ = self.total_p_mass.max()
-        suggestions = np.linspace(min_, max_/2, n_suggestion)
+        suggestions = np.linspace(min_, max_ / 2, n_suggestion)
 
         n_rows = math.ceil(n_suggestion / n_col)
 
-        fig, ax = plt.subplots(n_rows, n_col, figsize=[5*n_col, 5*n_rows])
+        fig, ax = plt.subplots(n_rows, n_col, figsize=[5 * n_col, 5 * n_rows])
         if n_rows == 1:
             ax = ax.reshape(1, -1)
 
@@ -62,31 +85,55 @@ class modified_VelocytoLoom():
 
             idx = self.total_p_mass > suggestions[i]
 
-                #ax_.scatter(gridpoints_coordinates[mass_filter, 0], gridpoints_coordinates[mass_filter, 1], s=0)
+            # ax_.scatter(gridpoints_coordinates[mass_filter, 0], gridpoints_coordinates[mass_filter, 1], s=0)
             ax_.scatter(self.embedding[:, 0], self.embedding[:, 1], c="lightgray", s=s)
-            ax_.scatter(self.flow_grid[idx, 0],
-                       self.flow_grid[idx, 1],
-                       c="black", s=s)
+            ax_.scatter(
+                self.flow_grid[idx, 0],
+                self.flow_grid[idx, 1],
+                c="black",
+                s=s,
+            )
             ax_.set_title(f"min_mass: {suggestions[i]: .2g}")
             ax_.axis("off")
 
-
-    def calculate_mass_filter(self, embedding_names, min_mass=itertools.repeat(0.01), plot=False):
-        for i,embedding_name in enumerate(embedding_names):
+    def calculate_mass_filter(
+        self,
+        embedding_names,
+        min_mass=itertools.repeat(0.01),
+        plot=False,
+    ):
+        for i, embedding_name in enumerate(embedding_names):
             self.embeddings[embedding_name].min_mass = min_mass[i]
-            self.embeddings[embedding_name].mass_filter = (self.embeddings[embedding_name].total_p_mass < min_mass[i])
-    
+            self.embeddings[embedding_name].mass_filter = (
+                self.embeddings[embedding_name].total_p_mass < min_mass[i]
+            )
+
             if plot:
-                fig, ax = plt.subplots(figsize=[5,5])
-    
-                #ax_.scatter(gridpoints_coordinates[mass_filter, 0], gridpoints_coordinates[mass_filter, 1], s=0)
-                ax.scatter(self.embeddings[embedding_name].embedding[:, 0], self.embeddings[embedding_name].embedding[:, 1], c="lightgray", s=10)
-                ax.scatter(self.embeddings[embedding_name].flow_grid[~self.embeddings[embedding_name].mass_filter, 0],
-                           self.embeddings[embedding_name].flow_grid[~self.embeddings[embedding_name].mass_filter, 1],
-                           c="black", s=0.5)
+                fig, ax = plt.subplots(figsize=[5, 5])
+
+                # ax_.scatter(gridpoints_coordinates[mass_filter, 0], gridpoints_coordinates[mass_filter, 1], s=0)
+                ax.scatter(
+                    self.embeddings[embedding_name].embedding[:, 0],
+                    self.embeddings[embedding_name].embedding[:, 1],
+                    c="lightgray",
+                    s=10,
+                )
+                ax.scatter(
+                    self.embeddings[embedding_name].flow_grid[
+                        ~self.embeddings[embedding_name].mass_filter,
+                        0,
+                    ],
+                    self.embeddings[embedding_name].flow_grid[
+                        ~self.embeddings[embedding_name].mass_filter,
+                        1,
+                    ],
+                    c="black",
+                    s=0.5,
+                )
                 ax.set_title("Grid points selected")
                 ax.axis("off")
 
+    """
     ## Get randomized GRN coef to do randomized perturbation simulation
     def calculate_randomized_coef_table(self, random_seed=123):
         "Calculate randomized GRN coef table."
@@ -94,47 +141,130 @@ class modified_VelocytoLoom():
         if hasattr(self, "coef_matrix_per_cluster"):
             coef_matrix_per_cluster_randomized = {}
             for key, val in self.coef_matrix_per_cluster.items():
-                coef_matrix_per_cluster_randomized[key] = _shuffle_celloracle_GRN_coef_table(coef_dataframe=val, random_seed=random_seed)
+                coef_matrix_per_cluster_randomized[key] = (
+                    _shuffle_celloracle_GRN_coef_table(
+                        coef_dataframe=val,
+                        random_seed=random_seed,
+                    )
+                )
             self.coef_matrix_per_cluster_randomized = coef_matrix_per_cluster_randomized
 
         if hasattr(self, "coef_matrix"):
-            self.coef_matrix_randomized = _shuffle_celloracle_GRN_coef_table(coef_dataframe=self.coef_matrix, random_seed=random_seed)
+            self.coef_matrix_randomized = _shuffle_celloracle_GRN_coef_table(
+                coef_dataframe=self.coef_matrix,
+                random_seed=random_seed,
+            )
 
-        if (hasattr(self, "coef_matrix_per_cluster") == False) and (hasattr(self, "coef_matrix") == False):
-            print("GRN calculation for simulation is not finished. Run fit_GRN_for_simulation() first.")
+        if (hasattr(self, "coef_matrix_per_cluster") == False) and (
+            hasattr(self, "coef_matrix") == False
+        ):
+            print(
+                "GRN calculation for simulation is not finished. Run fit_GRN_for_simulation() first.",
+            )
+    """
 
-    def plot_cluster_whole(self, embedding_name='', cluster_name='', ax=None, s=CONFIG["s_scatter"], args=CONFIG["default_args"]):
+    def plot_cluster_whole(
+        self,
+        embedding_name="",
+        cluster_name="",
+        ax=None,
+        s=CONFIG["s_scatter"],
+        args=CONFIG["default_args"],
+    ):
 
         if ax is None:
             ax = plt
-            
+
         # update color information
-        col_dict = _get_clustercolor_from_anndata(adata=self.perturbed_X,
-                                                  cluster_name=cluster_name,
-                                                  return_as="dict")
-        self.colorandum = np.array([col_dict[i] for i in self.perturbed_X.obs[cluster_name]])
-        
+        col_dict = _get_clustercolor_from_anndata(
+            adata=self.perturbed_X,
+            cluster_name=cluster_name,
+            return_as="dict",
+        )
+        self.colorandum = np.array(
+            [col_dict[i] for i in self.perturbed_X.obs[cluster_name]],
+        )
+
         c = self.colorandum
-        ax.scatter(self.embeddings[embedding_name].embedding[:, 0], self.embeddings[embedding_name].embedding[:, 1], c=c, s=s, **args)
+        ax.scatter(
+            self.embeddings[embedding_name].embedding[:, 0],
+            self.embeddings[embedding_name].embedding[:, 1],
+            c=c,
+            s=s,
+            **args,
+        )
         ax.axis("off")
 
-    def plot_simulation_flow_on_grid(self, embedding_name, ax=None, scale=CONFIG["scale_simulation"], show_background=True, s=CONFIG["s_scatter"], args=CONFIG["default_args_quiver"]):
-        self._plot_simulation_flow_on_grid(embedding_name=embedding_name, ax=ax, scale=scale, show_background=show_background, s=s, data_random=False, args=args)
+    def plot_simulation_flow_on_grid(
+        self,
+        embedding_name,
+        ax=None,
+        scale=CONFIG["scale_simulation"],
+        show_background=True,
+        s=CONFIG["s_scatter"],
+        args=CONFIG["default_args_quiver"],
+    ):
+        self._plot_simulation_flow_on_grid(
+            embedding_name=embedding_name,
+            ax=ax,
+            scale=scale,
+            show_background=show_background,
+            s=s,
+            data_random=False,
+            args=args,
+        )
 
+    def plot_simulation_flow_random_on_grid(
+        self,
+        embedding_name,
+        ax=None,
+        scale=CONFIG["scale_simulation"],
+        show_background=True,
+        s=CONFIG["s_scatter"],
+        args=CONFIG["default_args_quiver"],
+    ):
+        self._plot_simulation_flow_on_grid(
+            embedding_name=embedding_name,
+            ax=ax,
+            scale=scale,
+            show_background=show_background,
+            s=s,
+            data_random=True,
+            args=args,
+        )
 
-    def plot_simulation_flow_random_on_grid(self, embedding_name, ax=None, scale=CONFIG["scale_simulation"], show_background=True, s=CONFIG["s_scatter"], args=CONFIG["default_args_quiver"]):
-        self._plot_simulation_flow_on_grid(embedding_name=embedding_name, ax=ax, scale=scale, show_background=show_background, s=s, data_random=True, args=args)
-
-
-    def _plot_simulation_flow_on_grid(self, embedding_name='', ax=None, scale=CONFIG["scale_simulation"], show_background=True, s=CONFIG["s_scatter"], data_random=False, args=CONFIG["default_args_quiver"]):
+    def _plot_simulation_flow_on_grid(
+        self,
+        embedding_name="",
+        ax=None,
+        scale=CONFIG["scale_simulation"],
+        show_background=True,
+        s=CONFIG["s_scatter"],
+        data_random=False,
+        args=CONFIG["default_args_quiver"],
+    ):
 
         if ax is None:
             ax = plt
 
         if show_background:
-            plot_background(self=self, embedding_name=embedding_name, ax=ax, s=s, args=CONFIG["default_args"])
+            plot_background(
+                self=self,
+                embedding_name=embedding_name,
+                ax=ax,
+                s=s,
+                args=CONFIG["default_args"],
+            )
         else:
-            plot_cluster_cells_use(self=self, embedding_name=embedding_name, ax=ax, s=0, color=None, show_background=False, args={})
+            plot_cluster_cells_use(
+                self=self,
+                embedding_name=embedding_name,
+                ax=ax,
+                s=0,
+                color=None,
+                show_background=False,
+                args={},
+            )
 
         # mass filter selection
         if hasattr(self.embeddings[embedding_name], "mass_filter_simulation"):
@@ -144,7 +274,9 @@ class modified_VelocytoLoom():
 
         # Gridpoint cordinate selection
         if hasattr(self.embeddings[embedding_name], "gridpoints_coordinates"):
-            gridpoints_coordinates = self.embeddings[embedding_name].gridpoints_coordinates
+            gridpoints_coordinates = self.embeddings[
+                embedding_name
+            ].gridpoints_coordinates
         elif hasattr(self.embeddings[embedding_name], "mass_filter"):
             gridpoints_coordinates = self.embeddings[embedding_name].flow_grid
 
@@ -154,19 +286,32 @@ class modified_VelocytoLoom():
         else:
             flow = self.embeddings[embedding_name].flow
 
-        ax.quiver(gridpoints_coordinates[~mass_filter, 0],
-                  gridpoints_coordinates[~mass_filter, 1],
-                  flow[~mass_filter, 0],
-                  flow[~mass_filter, 1], #zorder=20000,
-                  scale=scale, **args)
+        ax.quiver(
+            gridpoints_coordinates[~mass_filter, 0],
+            gridpoints_coordinates[~mass_filter, 1],
+            flow[~mass_filter, 0],
+            flow[~mass_filter, 1],  # zorder=20000,
+            scale=scale,
+            **args,
+        )
 
         ax.axis("off")
 
-
-
-    def score_cv_vs_mean(self, N: int=3000, min_expr_cells: int=2, max_expr_avg: float=20, min_expr_avg: int=0, svr_gamma: float=None,
-                         winsorize: bool=False, winsor_perc: Tuple[float, float]=(1, 99.5), sort_inverse: bool=False, plot: bool=False) -> np.ndarray:
+    '''
+    def score_cv_vs_mean(
+        self,
+        N: int = 3000,
+        min_expr_cells: int = 2,
+        max_expr_avg: float = 20,
+        min_expr_avg: int = 0,
+        svr_gamma: float = None,
+        winsorize: bool = False,
+        winsor_perc: Tuple[float, float] = (1, 99.5),
+        sort_inverse: bool = False,
+        plot: bool = False,
+    ) -> np.ndarray:
         from sklearn.svm import SVR
+
         """Rank genes on the basis of a CV vs mean fit, it uses a nonparametric fit (Support Vector Regression)
 
         Arguments
@@ -210,10 +355,18 @@ class modified_VelocytoLoom():
         X = _adata_to_matrix(self.adata, "raw_count")
         if winsorize:
             if min_expr_cells <= ((100 - winsor_perc[1]) * X.shape[1] * 0.01):
-                min_expr_cells = int(np.ceil((100 - winsor_perc[1]) * X.shape[0] * 0.01)) + 2
-                logging.debug(f"min_expr_cells is too low for winsorization with upper_perc ={winsor_perc[1]}, upgrading to min_expr_cells ={min_expr_cells}")
+                min_expr_cells = (
+                    int(np.ceil((100 - winsor_perc[1]) * X.shape[0] * 0.01)) + 2
+                )
+                logging.debug(
+                    f"min_expr_cells is too low for winsorization with upper_perc ={winsor_perc[1]}, upgrading to min_expr_cells ={min_expr_cells}",
+                )
 
-        detected_bool = ((X > 0).sum(1) > min_expr_cells) & (X.mean(1) < max_expr_avg) & (X.mean(1) > min_expr_avg)
+        detected_bool = (
+            ((X > 0).sum(1) > min_expr_cells)
+            & (X.mean(1) < max_expr_avg)
+            & (X.mean(1) > min_expr_avg)
+        )
         Sf = X[detected_bool, :]
         if winsorize:
             down, up = np.percentile(Sf, winsor_perc, 1)
@@ -229,7 +382,7 @@ class modified_VelocytoLoom():
         log_cv = np.log2(cv)
 
         if svr_gamma is None:
-            svr_gamma = 150. / len(mu)
+            svr_gamma = 150.0 / len(mu)
             logging.debug(f"svr_gamma set to {svr_gamma}")
         # Fit the Support Vector Regression
         clf = SVR(gamma=svr_gamma)
@@ -238,11 +391,23 @@ class modified_VelocytoLoom():
         ff = fitted_fun(log_m[:, None])
         score = log_cv - ff
         if sort_inverse:
-            score = - score
+            score = -score
         nth_score = np.sort(score)[::-1][N]
         if plot:
-            scatter_viz(log_m[score > nth_score], log_cv[score > nth_score], s=3, alpha=0.4, c="tab:red")
-            scatter_viz(log_m[score <= nth_score], log_cv[score <= nth_score], s=3, alpha=0.4, c="tab:blue")
+            scatter_viz(
+                log_m[score > nth_score],
+                log_cv[score > nth_score],
+                s=3,
+                alpha=0.4,
+                c="tab:red",
+            )
+            scatter_viz(
+                log_m[score <= nth_score],
+                log_cv[score <= nth_score],
+                s=3,
+                alpha=0.4,
+                c="tab:blue",
+            )
             mu_linspace = np.linspace(np.min(log_m), np.max(log_m))
             plt.plot(mu_linspace, fitted_fun(mu_linspace[:, None]), c="k")
             plt.xlabel("log2 mean S")
@@ -252,10 +417,9 @@ class modified_VelocytoLoom():
         self.cv_mean_score[detected_bool] = score
         self.cv_mean_selected = self.cv_mean_score >= nth_score
         self.cv_mean_selected_genes = self.adata.var.index[self.cv_mean_selected].values
-
-
-
-    def perform_PCA(self, n_components: int=None, div_by_std: bool=False) -> None:
+    '''
+    '''
+    def perform_PCA(self, n_components: int = None, div_by_std: bool = False) -> None:
         """Perform PCA (cells as samples)
 
         Arguments
@@ -282,28 +446,35 @@ class modified_VelocytoLoom():
         else:
             self.pcs = self.pca.fit_transform(X.T)
 
-
-
-    def plot_pca(self, dim: List[int]=[0, 1, 2], elev: float=60, azim: float=-140) -> None:
-        """Plot 3d PCA
-        """
+    def plot_pca(
+        self,
+        dim: List[int] = [0, 1, 2],
+        elev: float = 60,
+        azim: float = -140,
+    ) -> None:
+        """Plot 3d PCA."""
 
         # update color information
-        col_dict = _get_clustercolor_from_anndata(adata=self.adata,
-                                                  cluster_name=self.cluster_column_name,
-                                                  return_as="dict")
-        self.colorandum = np.array([col_dict[i] for i in self.adata.obs[self.cluster_column_name]])
+        col_dict = _get_clustercolor_from_anndata(
+            adata=self.adata,
+            cluster_name=self.cluster_column_name,
+            return_as="dict",
+        )
+        self.colorandum = np.array(
+            [col_dict[i] for i in self.adata.obs[self.cluster_column_name]],
+        )
 
         fig = plt.figure(figsize=(8, 6))
-        ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(self.pcs[:, dim[0]],
-                   self.pcs[:, dim[1]],
-                   self.pcs[:, dim[2]],
-                   c=self.colorandum)
+        ax = fig.add_subplot(111, projection="3d")
+        ax.scatter(
+            self.pcs[:, dim[0]],
+            self.pcs[:, dim[1]],
+            self.pcs[:, dim[2]],
+            c=self.colorandum,
+        )
         ax.view_init(elev=elev, azim=azim)
 
 
-    '''
     def knn_imputation(self, k: int=None, metric: str="euclidean", diag: float=1,
                        n_pca_dims: int=None, maximum: bool=False,
                        balanced: bool=False, b_sight: int=None, b_maxl: int=None,
@@ -383,37 +554,52 @@ class modified_VelocytoLoom():
         self.k_knn_imputation = k
     '''
 
-#############
-    def estimate_transition_probs(self,
-                                 embedding_names: List[str], 
-                                 tf_name: str,
-                                 n_neighbors: List[int]=[None,None],
-                                 knn_random: bool=True, sampled_fraction: float=0.3,
-                                 sampling_probs: Tuple[float, float]=(0.5, 0.1),
-                                 n_jobs: int=4, threads: int=None, calculate_randomized: bool=True,
-                                 random_seed: int=15071990, cell_idx_use=None) -> None:
+    #############
+    def estimate_transition_probs(
+        self,
+        embedding_names: List[str],
+        tf_name: str,
+        n_neighbors: List[int] = [None, None],
+        knn_random: bool = True,
+        sampled_fraction: float = 0.3,
+        sampling_probs: Tuple[float, float] = (0.5, 0.1),
+        n_jobs: int = 4,
+        threads: int = None,
+        calculate_randomized: bool = True,
+        random_seed: int = 15071990,
+        cell_idx_use=None,
+    ) -> None:
         for embedding, n_neigh in zip(embedding_names, n_neighbors):
-            self.estimate_transition_prob(embedding_name=embedding,
-                                          tf_name=tf_name,
-                                          n_neighbors=n_neigh,
-                                          knn_random=knn_random, 
-                                          sampled_fraction=sampled_fraction,
-                                          sampling_probs=sampling_probs,
-                                          n_jobs=n_jobs,
-                                          threads=threads,
-                                          calculate_randomized=calculate_randomized,
-                                          random_seed=random_seed,
-                                          cell_idx_use=cell_idx_use)
-    
-    def estimate_transition_prob(self,
-                                 embedding_name: str,
-                                 tf_name: str,
-                                 n_neighbors: int=None,
-                                 knn_random: bool=True, sampled_fraction: float=0.3,
-                                 sampling_probs: Tuple[float, float]=(0.5, 0.1),
-                                 n_jobs: int=4, threads: int=None, calculate_randomized: bool=True,
-                                 random_seed: int=15071990, cell_idx_use=None) -> None:
-        """Use correlation to estimate transition probabilities for every cells to its embedding neighborhood
+            self.estimate_transition_prob(
+                embedding_name=embedding,
+                tf_name=tf_name,
+                n_neighbors=n_neigh,
+                knn_random=knn_random,
+                sampled_fraction=sampled_fraction,
+                sampling_probs=sampling_probs,
+                n_jobs=n_jobs,
+                threads=threads,
+                calculate_randomized=calculate_randomized,
+                random_seed=random_seed,
+                cell_idx_use=cell_idx_use,
+            )
+
+    def estimate_transition_prob(
+        self,
+        embedding_name: str,
+        tf_name: str,
+        n_neighbors: int = None,
+        knn_random: bool = True,
+        sampled_fraction: float = 0.3,
+        sampling_probs: Tuple[float, float] = (0.5, 0.1),
+        n_jobs: int = 4,
+        threads: int = None,
+        calculate_randomized: bool = True,
+        random_seed: int = 15071990,
+        cell_idx_use=None,
+    ) -> None:
+        """Use correlation to estimate transition probabilities for every cells
+        to its embedding neighborhood.
 
         Arguments
         ---------
@@ -445,11 +631,15 @@ class modified_VelocytoLoom():
 
         Returns
         -------
+
         """
 
         numba_random_seed(random_seed)
 
-        X = _obsm_to_matrix(self.perturbed_X, f"normalized_X_{tf_name}_dropout")  # [:, :ndims]
+        X = _obsm_to_matrix(
+            self.perturbed_X,
+            f"normalized_X_{tf_name}_dropout",
+        )  # [:, :ndims]
         delta_X = X - _obsm_to_matrix(self.perturbed_X, "normalized_X")
         embedding = self.perturbed_X.obsm[embedding_name]
         self.embeddings[embedding_name].embedding = embedding
@@ -457,11 +647,9 @@ class modified_VelocytoLoom():
         if n_neighbors is None:
             n_neighbors = int(self.perturbed_X.shape[0] / 5)
 
-
         if knn_random:
             np.random.seed(random_seed)
             self.corr_calc = "knn_random"
-
 
             if calculate_randomized:
                 delta_X_rndm = np.copy(delta_X)
@@ -472,17 +660,24 @@ class modified_VelocytoLoom():
             if cell_idx_use is None:
                 nn = NearestNeighbors(n_neighbors=n_neighbors + 1, n_jobs=n_jobs)
                 nn.fit(embedding)  # NOTE should support knn in high dimensions
-                self.embeddings[embedding_name].embedding_knn = nn.kneighbors_graph(mode="connectivity")
+                self.embeddings[embedding_name].embedding_knn = nn.kneighbors_graph(
+                    mode="connectivity",
+                )
 
             else:
-                self.embeddings[embedding_name].embedding_knn = calculate_embedding_knn_with_cell_idx(
-                                                                           embedding_original=self.embeddings[embedding_name].embedding,
-                                                                           cell_idx_use=cell_idx_use,
-                                                                           n_neighbors=n_neighbors,
-                                                                           n_jobs=n_jobs)
+                self.embeddings[embedding_name].embedding_knn = (
+                    calculate_embedding_knn_with_cell_idx(
+                        embedding_original=self.embeddings[embedding_name].embedding,
+                        cell_idx_use=cell_idx_use,
+                        n_neighbors=n_neighbors,
+                        n_jobs=n_jobs,
+                    )
+                )
 
             # Pick random neighbours and prune the rest
-            neigh_ixs = self.embeddings[embedding_name].embedding_knn.indices.reshape((-1, n_neighbors + 1))
+            neigh_ixs = self.embeddings[embedding_name].embedding_knn.indices.reshape(
+                (-1, n_neighbors + 1),
+            )
             p = np.linspace(sampling_probs[0], sampling_probs[1], neigh_ixs.shape[1])
             p = p / p.sum()
 
@@ -491,39 +686,71 @@ class modified_VelocytoLoom():
             # Not updated yet not to break previous analyses
             # Fix is substituting below `neigh_ixs.shape[1]` with `np.arange(1,neigh_ixs.shape[1]-1)`
             # I change it here since I am doing some breaking changes
-            sampling_ixs = np.stack([np.random.choice(neigh_ixs.shape[1],
-                                                      size=(int(sampled_fraction * (n_neighbors + 1)),),
-                                                      replace=False,
-                                                      p=p) for i in range(neigh_ixs.shape[0])], 0)
+            sampling_ixs = np.stack(
+                [
+                    np.random.choice(
+                        neigh_ixs.shape[1],
+                        size=(int(sampled_fraction * (n_neighbors + 1)),),
+                        replace=False,
+                        p=p,
+                    )
+                    for i in range(neigh_ixs.shape[0])
+                ],
+                0,
+            )
             self.embeddings[embedding_name].sampling_ixs = sampling_ixs
             neigh_ixs = neigh_ixs[np.arange(neigh_ixs.shape[0])[:, None], sampling_ixs]
             nonzero = neigh_ixs.shape[0] * neigh_ixs.shape[1]
-            self.embeddings[embedding_name].embedding_knn = sparse.csr_matrix((np.ones(nonzero),
-                                                    neigh_ixs.ravel(),
-                                                    np.arange(0, nonzero + 1, neigh_ixs.shape[1])),
-                                                   shape=(neigh_ixs.shape[0],
-                                                          neigh_ixs.shape[0]))
+            self.embeddings[embedding_name].embedding_knn = sparse.csr_matrix(
+                (
+                    np.ones(nonzero),
+                    neigh_ixs.ravel(),
+                    np.arange(0, nonzero + 1, neigh_ixs.shape[1]),
+                ),
+                shape=(
+                    neigh_ixs.shape[0],
+                    neigh_ixs.shape[0],
+                ),
+            )
 
             logging.debug(f"Correlation Calculation '{self.corr_calc}'")
 
             ###
             ###
-            self.embeddings[embedding_name].corrcoef = colDeltaCorpartial(X, delta_X, neigh_ixs, threads=threads)
+            self.embeddings[embedding_name].corrcoef = colDeltaCorpartial(
+                X,
+                delta_X,
+                neigh_ixs,
+                threads=threads,
+            )
             if calculate_randomized:
                 logging.debug(f"Correlation Calculation for negative control")
-                self.embeddings[embedding_name].corrcoef_random = colDeltaCorpartial(X, delta_X_rndm, neigh_ixs, threads=threads)
+                self.embeddings[embedding_name].corrcoef_random = colDeltaCorpartial(
+                    X,
+                    delta_X_rndm,
+                    neigh_ixs,
+                    threads=threads,
+                )
             ######
 
             if np.any(np.isnan(self.embeddings[embedding_name].corrcoef)):
-                self.embeddings[embedding_name].corrcoef[np.isnan(self.embeddings[embedding_name].corrcoef)] = 1
-                logging.debug("Nans encountered in corrcoef and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.")
-                #logging.warning("Nans encountered in corrcoef and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.")
+                self.embeddings[embedding_name].corrcoef[
+                    np.isnan(self.embeddings[embedding_name].corrcoef)
+                ] = 1
+                logging.debug(
+                    "Nans encountered in corrcoef and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.",
+                )
+                # logging.warning("Nans encountered in corrcoef and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.")
             if calculate_randomized:
                 np.fill_diagonal(self.embeddings[embedding_name].corrcoef_random, 0)
                 if np.any(np.isnan(self.embeddings[embedding_name].corrcoef_random)):
-                    self.embeddings[embedding_name].corrcoef_random[np.isnan(self.embeddings[embedding_name].corrcoef_random)] = 1
-                    #logging.warning("Nans encountered in corrcoef and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.")
-                    logging.debug("Nans encountered in corrcoef_random and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.")
+                    self.embeddings[embedding_name].corrcoef_random[
+                        np.isnan(self.embeddings[embedding_name].corrcoef_random)
+                    ] = 1
+                    # logging.warning("Nans encountered in corrcoef and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.")
+                    logging.debug(
+                        "Nans encountered in corrcoef_random and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.",
+                    )
             logging.debug(f"Done Correlation Calculation")
         else:
             self.corr_calc = "full"
@@ -535,28 +762,49 @@ class modified_VelocytoLoom():
             logging.debug("Calculate KNN in the embedding space")
             nn = NearestNeighbors(n_neighbors=n_neighbors + 1, n_jobs=n_jobs)
             nn.fit(embedding)
-            self.embeddings[embedding_name].embedding_knn = nn.kneighbors_graph(mode="connectivity")
+            self.embeddings[embedding_name].embedding_knn = nn.kneighbors_graph(
+                mode="connectivity",
+            )
 
             logging.debug("Correlation Calculation 'full'")
             #####
-            self.embeddings[embedding_name].corrcoef = colDeltaCor(X, delta_X, threads=threads)
+            self.embeddings[embedding_name].corrcoef = colDeltaCor(
+                X,
+                delta_X,
+                threads=threads,
+            )
             if calculate_randomized:
                 logging.debug(f"Correlation Calculation for negative control")
-                self.embeddings[embedding_name].corrcoef_random = colDeltaCor(X, delta_X_rndm, threads=threads)
+                self.embeddings[embedding_name].corrcoef_random = colDeltaCor(
+                    X,
+                    delta_X_rndm,
+                    threads=threads,
+                )
 
             #####
             np.fill_diagonal(self.embeddings[embedding_name].corrcoef, 0)
             if calculate_randomized:
                 np.fill_diagonal(self.embeddings[embedding_name].corrcoef_random, 0)
 
-############
-    def calculate_embedding_shifts(self, embedding_names: List[str], sigma_corr: float=0.05) -> None:
+    ############
+    def calculate_embedding_shifts(
+        self,
+        embedding_names: List[str],
+        sigma_corr: float = 0.05,
+    ) -> None:
         for embedding_name in embedding_names:
-            self.calculate_embedding_shift(embedding_name=embedding_name, 
-                                           sigma_corr=sigma_corr)
-    
-    def calculate_embedding_shift(self, embedding_name: str, sigma_corr: float=0.05) -> None:
-        """Use the transition probability to project the velocity direction on the embedding
+            self.calculate_embedding_shift(
+                embedding_name=embedding_name,
+                sigma_corr=sigma_corr,
+            )
+
+    def calculate_embedding_shift(
+        self,
+        embedding_name: str,
+        sigma_corr: float = 0.05,
+    ) -> None:
+        """Use the transition probability to project the velocity direction on
+        the embedding.
 
         Arguments
         ---------
@@ -570,39 +818,76 @@ class modified_VelocytoLoom():
             the transition probability calculated using the exponential kernel on the correlation coefficient
         delta_embedding: np.ndarray
             The resulting vector
+
         """
         # Kernel evaluation
         logging.debug("Calculate transition probability")
 
         # NOTE maybe sparse matrix here are slower than dense
         # NOTE if knn_random this could be made much faster either using sparse matrix or neigh_ixs
-        self.embeddings[embedding_name].transition_prob = np.exp(self.embeddings[embedding_name].corrcoef / sigma_corr) * self.embeddings[embedding_name].embedding_knn.todense().A  # naive
-        self.embeddings[embedding_name].transition_prob /= self.embeddings[embedding_name].transition_prob.sum(1)[:, None]
+        self.embeddings[embedding_name].transition_prob = (
+            np.exp(self.embeddings[embedding_name].corrcoef / sigma_corr)
+            * self.embeddings[embedding_name].embedding_knn.todense().A
+        )  # naive
+        self.embeddings[embedding_name].transition_prob /= self.embeddings[
+            embedding_name
+        ].transition_prob.sum(1)[:, None]
         if hasattr(self.embeddings[embedding_name], "corrcoef_random"):
             logging.debug("Calculate transition probability for negative control")
-            self.embeddings[embedding_name].transition_prob_random = np.exp(self.embeddings[embedding_name].corrcoef_random / sigma_corr) * self.embeddings[embedding_name].embedding_knn.todense().A  # naive
-            self.embeddings[embedding_name].transition_prob_random /= self.embeddings[embedding_name].transition_prob_random.sum(1)[:, None]
+            self.embeddings[embedding_name].transition_prob_random = (
+                np.exp(self.embeddings[embedding_name].corrcoef_random / sigma_corr)
+                * self.embeddings[embedding_name].embedding_knn.todense().A
+            )  # naive
+            self.embeddings[embedding_name].transition_prob_random /= self.embeddings[
+                embedding_name
+            ].transition_prob_random.sum(1)[:, None]
 
-        unitary_vectors = self.embeddings[embedding_name].embedding.T[:, None, :] - self.embeddings[embedding_name].embedding.T[:, :, None]  # shape (2,ncells,ncells)
-        with np.errstate(divide='ignore', invalid='ignore'):
-            unitary_vectors /= np.linalg.norm(unitary_vectors, ord=2, axis=0)  # divide by L2
+        unitary_vectors = (
+            self.embeddings[embedding_name].embedding.T[:, None, :]
+            - self.embeddings[embedding_name].embedding.T[:, :, None]
+        )  # shape (2,ncells,ncells)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            unitary_vectors /= np.linalg.norm(
+                unitary_vectors,
+                ord=2,
+                axis=0,
+            )  # divide by L2
             np.fill_diagonal(unitary_vectors[0, ...], 0)  # fix nans
             np.fill_diagonal(unitary_vectors[1, ...], 0)
 
-        self.embeddings[embedding_name].delta_embedding = (self.embeddings[embedding_name].transition_prob * unitary_vectors).sum(2)
-        self.embeddings[embedding_name].delta_embedding -= (self.embeddings[embedding_name].embedding_knn.todense().A * unitary_vectors).sum(2) / self.embeddings[embedding_name].embedding_knn.sum(1).A.T
-        self.embeddings[embedding_name].delta_embedding = self.embeddings[embedding_name].delta_embedding.T
-
+        self.embeddings[embedding_name].delta_embedding = (
+            self.embeddings[embedding_name].transition_prob * unitary_vectors
+        ).sum(2)
+        self.embeddings[embedding_name].delta_embedding -= (
+            self.embeddings[embedding_name].embedding_knn.todense().A * unitary_vectors
+        ).sum(2) / self.embeddings[embedding_name].embedding_knn.sum(1).A.T
+        self.embeddings[embedding_name].delta_embedding = self.embeddings[
+            embedding_name
+        ].delta_embedding.T
 
         if hasattr(self.embeddings[embedding_name], "corrcoef_random"):
-            self.embeddings[embedding_name].delta_embedding_random = (self.embeddings[embedding_name].transition_prob_random * unitary_vectors).sum(2)
-            self.embeddings[embedding_name].delta_embedding_random -= (self.embeddings[embedding_name].embedding_knn.todense().A * unitary_vectors).sum(2) / self.embeddings[embedding_name].embedding_knn.sum(1).A.T
-            self.embeddings[embedding_name].delta_embedding_random = self.embeddings[embedding_name].delta_embedding_random.T
+            self.embeddings[embedding_name].delta_embedding_random = (
+                self.embeddings[embedding_name].transition_prob_random * unitary_vectors
+            ).sum(2)
+            self.embeddings[embedding_name].delta_embedding_random -= (
+                self.embeddings[embedding_name].embedding_knn.todense().A
+                * unitary_vectors
+            ).sum(2) / self.embeddings[embedding_name].embedding_knn.sum(1).A.T
+            self.embeddings[embedding_name].delta_embedding_random = self.embeddings[
+                embedding_name
+            ].delta_embedding_random.T
 
-
-    def calculate_grid_arrows(self, embedding, smooth: float=0.5, steps: Tuple=(40, 40),
-                              n_neighbors: int=100, n_jobs: int=4, xylim: Tuple=((None, None), (None, None))) -> None:
-        """Calculate the velocity using a points on a regular grid and a gaussian kernel
+    def calculate_grid_arrows(
+        self,
+        embedding,
+        smooth: float = 0.5,
+        steps: Tuple = (40, 40),
+        n_neighbors: int = 100,
+        n_jobs: int = 4,
+        xylim: Tuple = ((None, None), (None, None)),
+    ) -> None:
+        """Calculate the velocity using a points on a regular grid and a
+        gaussian kernel.
 
         Note: the function should work also for n-dimensional grid
 
@@ -644,7 +929,10 @@ class modified_VelocytoLoom():
         emb = self.embeddings[embedding].embedding
 
         if hasattr(self.embeddings[embedding], "corrcoef_random"):
-            delta_embedding_random = getattr(self.embeddings[embedding], f"delta_embedding_random")
+            delta_embedding_random = getattr(
+                self.embeddings[embedding],
+                f"delta_embedding_random",
+            )
 
         # Prepare the grid
         grs = []
@@ -673,25 +961,52 @@ class modified_VelocytoLoom():
         gaussian_w = normal.pdf(loc=0, scale=smooth * std, x=dists)
         self.embeddings[embedding].total_p_mass = gaussian_w.sum(1)
 
-        UZ = (delta_embedding[neighs] * gaussian_w[:, :, None]).sum(1) / np.maximum(1, self.embeddings[embedding].total_p_mass)[:, None]  # weighed average
+        UZ = (delta_embedding[neighs] * gaussian_w[:, :, None]).sum(1) / np.maximum(
+            1,
+            self.embeddings[embedding].total_p_mass,
+        )[
+            :,
+            None,
+        ]  # weighed average
         magnitude = np.linalg.norm(UZ, axis=1)
         # Assign attributes
         self.embeddings[embedding].flow_embedding = emb
         self.embeddings[embedding].flow_grid = gridpoints_coordinates
         self.embeddings[embedding].flow = UZ
         self.embeddings[embedding].flow_norm = UZ / np.percentile(magnitude, 99.5)
-        self.embeddings[embedding].flow_norm_magnitude = np.linalg.norm(self.embeddings[embedding].flow_norm, axis=1)
+        self.embeddings[embedding].flow_norm_magnitude = np.linalg.norm(
+            self.embeddings[embedding].flow_norm,
+            axis=1,
+        )
 
         if hasattr(self.embeddings[embedding], "corrcoef_random"):
-            UZ_rndm = (delta_embedding_random[neighs] * gaussian_w[:, :, None]).sum(1) / np.maximum(1, self.embeddings[embedding].total_p_mass)[:, None]  # weighed average
+            UZ_rndm = (delta_embedding_random[neighs] * gaussian_w[:, :, None]).sum(
+                1,
+            ) / np.maximum(1, self.embeddings[embedding].total_p_mass)[
+                :,
+                None,
+            ]  # weighed average
             magnitude_rndm = np.linalg.norm(UZ, axis=1)
             # Assign attributes
             self.embeddings[embedding].flow_rndm = UZ_rndm
-            self.embeddings[embedding].flow_norm_rndm = UZ_rndm / np.percentile(magnitude_rndm, 99.5)
-            self.embeddings[embedding].flow_norm_magnitude_rndm = np.linalg.norm(self.embeddings[embedding].flow_norm_rndm, axis=1)
+            self.embeddings[embedding].flow_norm_rndm = UZ_rndm / np.percentile(
+                magnitude_rndm,
+                99.5,
+            )
+            self.embeddings[embedding].flow_norm_magnitude_rndm = np.linalg.norm(
+                self.embeddings[embedding].flow_norm_rndm,
+                axis=1,
+            )
 
-    def prepare_markov(self, sigma_D: np.ndarray, sigma_W: np.ndarray, direction: str="forward", cells_ixs: np.ndarray=None) -> None:
-        """Prepare a transition probability for Markov process
+    '''
+    def prepare_markov(
+        self,
+        sigma_D: np.ndarray,
+        sigma_W: np.ndarray,
+        direction: str = "forward",
+        cells_ixs: np.ndarray = None,
+    ) -> None:
+        """Prepare a transition probability for Markov process.
 
         Arguments
         ---------
@@ -721,7 +1036,10 @@ class modified_VelocytoLoom():
         if direction == "forward":
             self.tr = np.array(self.transition_prob[cells_ixs, :][:, cells_ixs])
         elif direction == "backwards":
-            self.tr = np.array((self.transition_prob[cells_ixs, :][:, cells_ixs]).T, order="C")
+            self.tr = np.array(
+                (self.transition_prob[cells_ixs, :][:, cells_ixs]).T,
+                order="C",
+            )
         else:
             raise NotImplementedError(f"{direction} is not an implemented direction")
         dist_matrix = squareform(pdist(self.embedding[cells_ixs, :]))
@@ -739,26 +1057,38 @@ class modified_VelocytoLoom():
 
         if hasattr(self, "corrcoef_random"):
             if direction == "forward":
-                self.tr_random = np.array(self.transition_prob_random[cells_ixs, :][:, cells_ixs])
+                self.tr_random = np.array(
+                    self.transition_prob_random[cells_ixs, :][:, cells_ixs],
+                )
             elif direction == "backwards":
-                self.tr_random = np.array((self.transition_prob_random[cells_ixs, :][:, cells_ixs]).T, order="C")
+                self.tr_random = np.array(
+                    (self.transition_prob_random[cells_ixs, :][:, cells_ixs]).T,
+                    order="C",
+                )
             else:
-                raise NotImplementedError(f"{direction} is not an implemented direction")
-            #dist_matrix = squareform(pdist(self.embedding[cells_ixs, :]))
-            #K_D = gaussian_kernel(dist_matrix, sigma=sigma_D)
+                raise NotImplementedError(
+                    f"{direction} is not an implemented direction",
+                )
+            # dist_matrix = squareform(pdist(self.embedding[cells_ixs, :]))
+            # K_D = gaussian_kernel(dist_matrix, sigma=sigma_D)
             self.tr_random = self.tr_random * K_D
             # Fill diagonal with max or the row and sum=1 normalize
             np.fill_diagonal(self.tr_random, self.tr_random.max(1))
             self.tr_random = self.tr_random / self.tr_random.sum(1)[:, None]
 
-            #K_W = gaussian_kernel(dist_matrix, sigma=sigma_W)
-            #K_W = K_W / K_W.sum(1)[:, None]
+            # K_W = gaussian_kernel(dist_matrix, sigma=sigma_W)
+            # K_W = K_W / K_W.sum(1)[:, None]
             self.tr_random = 0.8 * self.tr_random + 0.2 * K_W
             self.tr_random = self.tr_random / self.tr_random.sum(1)[:, None]
             self.tr_random = scipy.sparse.csr_matrix(self.tr_random)
 
-    def run_markov(self, starting_p: np.ndarray=None, n_steps: int=2500, mode: str="time_evolution") -> None:
-        """Run a Markov process
+    def run_markov(
+        self,
+        starting_p: np.ndarray = None,
+        n_steps: int = 2500,
+        mode: str = "time_evolution",
+    ) -> None:
+        """Run a Markov process.
 
         Arguments
         ---------
@@ -775,21 +1105,25 @@ class modified_VelocytoLoom():
         Nothing but it creates the attribute:
         diffused: np.ndarray
             The probability to be found at any of the states
+
         """
         self.prepare_markov_simulation()
 
         if starting_p is None:
             starting_p = np.ones(self.tr.shape[0]) / self.tr.shape[0]
         diffusor = Diffusion()
-        self.diffused = diffusor.diffuse(starting_p, self.tr, n_steps=n_steps, mode=mode)[0]
-
-
-
-
+        self.diffused = diffusor.diffuse(
+            starting_p,
+            self.tr,
+            n_steps=n_steps,
+            mode=mode,
+        )[0]
+    '''
 
 
 def scatter_viz(x: np.ndarray, y: np.ndarray, *args: Any, **kwargs: Any) -> Any:
-    """A wrapper of scatter plot that guarantees that every point is visible in a very crowded scatterplot
+    """A wrapper of scatter plot that guarantees that every point is visible in
+    a very crowded scatterplot.
 
     Args
     ----
@@ -803,6 +1137,7 @@ def scatter_viz(x: np.ndarray, y: np.ndarray, *args: Any, **kwargs: Any) -> Any:
     Returns
     -------
     Plots the graph and returns the axes object
+
     """
     ix_x_sort = np.argsort(x, kind="mergesort")
     ix_yx_sort = np.argsort(y[ix_x_sort], kind="mergesort")
@@ -818,55 +1153,68 @@ def scatter_viz(x: np.ndarray, y: np.ndarray, *args: Any, **kwargs: Any) -> Any:
             kwargs_new[karg] = varg[ix_x_sort][ix_yx_sort]
         else:
             kwargs_new[karg] = varg
-    ax = plt.scatter(x[ix_x_sort][ix_yx_sort], y[ix_x_sort][ix_yx_sort], *args_new, **kwargs_new)
+    ax = plt.scatter(
+        x[ix_x_sort][ix_yx_sort],
+        y[ix_x_sort][ix_yx_sort],
+        *args_new,
+        **kwargs_new,
+    )
     return ax
 
 
-
-def calculate_embedding_knn_with_cell_idx(embedding_original, cell_idx_use, n_neighbors, n_jobs=4):
-
-    """
-    Calculate knn graph focusing on a cell population.
-
-    """
-
+'''
+def calculate_embedding_knn_with_cell_idx(
+    embedding_original,
+    cell_idx_use,
+    n_neighbors,
+    n_jobs=4,
+):
+    """Calculate knn graph focusing on a cell population."""
 
     nn = NearestNeighbors(n_neighbors=n_neighbors + 1, n_jobs=n_jobs)
-    nn.fit(embedding_original[cell_idx_use, :])  # NOTE should support knn in high dimensions
+    nn.fit(
+        embedding_original[cell_idx_use, :],
+    )  # NOTE should support knn in high dimensions
     embedding_knn = nn.kneighbors_graph(mode="connectivity")
 
-    #print(embedding_knn.indices.max())
+    # print(embedding_knn.indices.max())
 
     indices_in_original_emb = cell_idx_use[embedding_knn.indices]
     neigh_ixs = np.zeros((embedding_original.shape[0], n_neighbors + 1))
     neigh_ixs[cell_idx_use, :] = indices_in_original_emb.reshape((-1, n_neighbors + 1))
 
     nonzero = neigh_ixs.shape[0] * neigh_ixs.shape[1]
-    embedding_knn = sparse.csr_matrix((np.ones(nonzero),
-                                      neigh_ixs.ravel(),
-                                      np.arange(0, nonzero + 1, neigh_ixs.shape[1])),
-                                      shape=(neigh_ixs.shape[0],
-                                             neigh_ixs.shape[0]))
+    embedding_knn = sparse.csr_matrix(
+        (
+            np.ones(nonzero),
+            neigh_ixs.ravel(),
+            np.arange(0, nonzero + 1, neigh_ixs.shape[1]),
+        ),
+        shape=(
+            neigh_ixs.shape[0],
+            neigh_ixs.shape[0],
+        ),
+    )
     return embedding_knn
+'''
 
 
 @jit(nopython=True)
 def numba_random_seed(value: int) -> None:
-    """Same as np.random.seed but for numba"""
+    """Same as np.random.seed but for numba."""
     np.random.seed(value)
 
 
 @jit(nopython=True)
 def permute_rows_nsign(A: np.ndarray) -> None:
-    """Permute in place the entries and randomly switch the sign for each row of a matrix independently.
-    """
+    """Permute in place the entries and randomly switch the sign for each row of
+    a matrix independently."""
     plmi = np.array([+1, -1])
     for i in range(A.shape[0]):
         np.random.shuffle(A[i, :])
         A[i, :] = A[i, :] * np.random.choice(plmi, size=A.shape[1])
 
 
-
-def gaussian_kernel(X: np.ndarray, mu: float=0, sigma: float=1) -> np.ndarray:
-    """Compute gaussian kernel"""
-    return np.exp(-(X - mu)**2 / (2 * sigma**2)) / np.sqrt(2 * np.pi * sigma**2)
+def gaussian_kernel(X: np.ndarray, mu: float = 0, sigma: float = 1) -> np.ndarray:
+    """Compute gaussian kernel."""
+    return np.exp(-((X - mu) ** 2) / (2 * sigma**2)) / np.sqrt(2 * np.pi * sigma**2)

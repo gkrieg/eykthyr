@@ -1,6 +1,8 @@
 from dataclasses import dataclass
+
 import numpy as np
 from scipy.sparse import spmatrix
+
 
 @dataclass
 class Embedding:
@@ -26,4 +28,3 @@ class Embedding:
     min_mass: float = None
     mass_filter: np.ndarray = None
     colorandum: np.ndarray = None
-    
