@@ -1,4 +1,4 @@
-from typing import Sequence, Union, Optional
+from typing import Sequence, Union, Optional, Dict
 from pathlib import Path
 
 import scanpy as sc
@@ -15,9 +15,13 @@ from popari import tl, pl
 
 from .util import get_metagene_edges_window, run_all_perturbations
 
+from .modified_VelocytoLoom_class import modified_VelocytoLoom
+
+from .embedding import Embedding
 
 
-class Eykthyr():
+
+class Eykthyr(modified_VelocytoLoom):
     
     def __init__(self,
         RNA: Optional[sc.AnnData] = None,
@@ -29,6 +33,7 @@ class Eykthyr():
         name: str = 'eykthyr_dataset',
         cluster_annotation: Sequence[str] = [],
         num_metagenes: int = -1,
+        embeddings: Optional[Dict[str, Embedding]] = {},
     ):
 
         self.RNA = RNA
@@ -43,6 +48,7 @@ class Eykthyr():
 
         self.cluster_annotation = cluster_annotation
         self.num_metagenes = num_metagenes
+        self.embeddings = embeddings
 
 
     def preprocess_rna(self,
@@ -91,6 +97,7 @@ class Eykthyr():
         popari_d.compute_spatial_neighbors()
         self.RNA.obs['adjacency_list'] = popari_d.obs['adjacency_list']
         self.RNA.obsp['adjacency_matrix'] = popari_d.obsp['adjacency_matrix']
+        self.RNA.X = self.RNA.X.todense()
 
         self.popari = Popari(
             K=K,
@@ -330,9 +337,9 @@ def load_anndata(dirpath):
                       perturbed_X = perturbed_X,
                       popari = popari
                       )
-    eykthyr.datasetname = eykthyr.RNA.uns['datasetname']
-    eykthyr.rna_preprocessed = eykthyr.RNA.uns['rna_preprocessed']
-    eykthyr.cluster_annotation = eykthyr.RNA.uns['cluster_annotation']
-    eykthyr.num_metagenes = eykthyr.RNA.uns['num_metagenes']
+    # eykthyr.datasetname = eykthyr.RNA.uns['datasetname']
+    # eykthyr.rna_preprocessed = eykthyr.RNA.uns['rna_preprocessed']
+    # eykthyr.cluster_annotation = eykthyr.RNA.uns['cluster_annotation']
+    # eykthyr.num_metagenes = eykthyr.RNA.uns['num_metagenes']
     return eykthyr
 

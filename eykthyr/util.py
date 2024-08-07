@@ -1,13 +1,21 @@
 import os
 import sys
 import math
+from tqdm import tqdm
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy as sc
 import seaborn as sns
-import celloracle as co
+# import celloracle as co
+CONFIG = {"default_args": {"lw": 0.3, "rasterized": True},
+          "s_scatter": 5,
+          "s_grid": 20,
+          "scale_simulation": 30,
+          "scale_dev": 30,
+          "cmap_ps": "PiYG",
+          "default_args_quiver": {"linewidths": 0.25, "width": 0.004}}
 
 
 def get_predecessors(g,links):
@@ -83,7 +91,6 @@ def get_downstream_genes(target_gene, links, num_hops=3,use_coefs=True):
     return downstream_genes,downstream_genes_signs
 
 def get_metagenes_score(adata,regulators,m_name,links,links_dict_num='0',negative_signs=True,use_coefs=True):
-    print('starting metagenes scoring')
     regdf = pd.DataFrame(index=regulators, columns=adata.uns['spicemix_genes'].astype(str),dtype=int)
     regdf.loc[:,:] = 0
     for regnum,reg in enumerate(regulators):
@@ -94,8 +101,6 @@ def get_metagenes_score(adata,regulators,m_name,links,links_dict_num='0',negativ
                     regdf.loc[reg,g] = abs(signs[g])
                 else:
                     regdf.loc[reg,g] = signs[g]
-        if regnum % 5 == 0:
-            print(f'{regnum} of {len(regulators)} done')
     regdf = regdf.loc[regdf.sum(axis=1) != 0]
     metagenes = adata.uns['M'][m_name]
     mval_nonorm = np.matmul(regdf,metagenes).astype(float)
@@ -124,17 +129,15 @@ def get_intersecting(ms_nonorm, metagene_scores,k=10):
 
 
 from sklearn.ensemble import BaggingRegressor
-from celloracle.utility import standard, intersect
+# from celloracle.utility import standard, intersect
 from sklearn.linear_model import Ridge
-from celloracle.network.regression_models import _get_coef_matrix
+# from celloracle.network.regression_models import _get_coef_matrix
 def get_edges_window(ad_ex, ad_motif, target_gene, grn, ad_pop, num_hops=1):
     
     #subset the ad_ex and ad_motif by the neighbors
     tfs = intersect(grn[target_gene],ad_motif.var_names)
     retdf = pd.DataFrame(index=tfs)
     for i, cell in enumerate(ad_ex.obs_names):
-        if i % 100 == 0:
-            print(i)
 #         neighbors_bool = np.asarray(ad_pop.obsp['adjacency_matrix'][i,:].todense().astype(bool)).flatten()
         neighbors_bool = get_nhop_neighbors(ad_pop, i, num_hops=num_hops)
         neighbors = ad_ex.obs_names[neighbors_bool]
@@ -199,9 +202,7 @@ def get_metagene_edges_window(ad_ex, ad_motif, target_metagene, ad_pop, num_hops
     retdf = pd.DataFrame(index=tfs)
     if cluster_id != None:
         nn_indices = get_nearest_neighbors(ad_pop)
-    for i, cell in enumerate(ad_ex.obs_names):
-        if i % 100 == 0:
-            print(i)
+    for i, cell in tqdm(enumerate(ad_ex.obs_names)):
 #         neighbors_bool = np.asarray(ad_pop.obsp['adjacency_matrix'][i,:].todense().astype(bool)).flatten()
         if cluster_id == None:
             neighbors_bool = get_nhop_neighbors(ad_pop, i, num_hops=num_hops)
@@ -232,12 +233,10 @@ def get_metagene_edges_smoothed(ad_ex, ad_motif, metagene_num, ad_pop, num_hops=
     #subset the ad_ex and ad_motif by the neighbors
     tfs = ad_motif.var_names
     retdf = pd.DataFrame(index=tfs)
-    for target_metagene in range(metagene_num):
+    for target_metagene in tqdm(range(metagene_num)):
         data = pd.DataFrame(index=tfs,dtype=np.float64)
         label = pd.DataFrame(index=[target_metagene],dtype=np.float64)
         for i, cell in enumerate(ad_ex.obs_names):
-            if i % 100 == 0:
-                print(i)
 #         neighbors_bool = np.asarray(ad_pop.obsp['adjacency_matrix'][i,:].todense().astype(bool)).flatten()
             neighbors_bool = get_nhop_neighbors(ad_pop, i, num_hops=num_hops)
             neighbors = ad_ex.obs_names[neighbors_bool]
@@ -245,9 +244,7 @@ def get_metagene_edges_smoothed(ad_ex, ad_motif, metagene_num, ad_pop, num_hops=
                 data[cell] = np.zeros((len(tfs),1))
                 label[cell] = 0
                 continue
-#         print(ad_motif[neighbors,tfs].X.sum(axis=0))
             data[cell] = np.asarray(ad_motif[neighbors,tfs].X.sum(axis=0))
-#         print(data)
             #label[cell] = np.asarray(ad_pop[neighbors,:].obsm['normalized_X'][:,target_metagene].sum())
             label[cell] = np.asarray(ad_pop[neighbors,:].obsm['X'][:,target_metagene].sum())
         data = data.T - data.T.min(axis=0)  
@@ -262,7 +259,6 @@ def get_metagene_edges_smoothed(ad_ex, ad_motif, metagene_num, ad_pop, num_hops=
                                 max_features=0.8,
                                 verbose=False,
                                 random_state=123)
-#     print(data, label)
         model.fit(data,label)
         ans = _get_coef_matrix(model, tfs).mean(axis=0)
         retdf[str(target_metagene)] = ans
@@ -362,12 +358,8 @@ def run_all_perturbations(pop, ad_tfs, ad_edges, K=16, multiplier=1, useX=False,
     for pop_ad, ad_tf, ad_edge, ite in zip(pop.datasets, ad_tfs, ad_edges, range(len(pop.datasets))):
         tfs = ad_tf.var_names
         #cluster_changes = {}
-        checkpoints = 100
-        for it, tf in enumerate(tfs):
-            if it % checkpoints == 0:
-                print(it)
+        for it, tf in tqdm(enumerate(tfs)):
             in_silico_perturb(pop_ad, ad_tf, ad_edge, tf, K=K, multiplier=multiplier, useX=useX)
-        print('done perturbation')
         #tl.leiden(pop, use_rep=f"X_{tf}_dropout", target_clusters=10)
         if get_leiden == True:
             tl.leiden(pop, use_rep=f"normalized_X_{tf}_dropout", target_clusters=target_clusters)
@@ -375,7 +367,6 @@ def run_all_perturbations(pop, ad_tfs, ad_edges, K=16, multiplier=1, useX=False,
             len_satisfies = test_all_true([len(d.obs['leiden'].unique()) <= target_clusters for d in pop.datasets])
             while len_satisfies == False:
                 j -= 1
-                print(f'j {j}')
                 #tl.leiden(pop, use_rep=f"X_{tf}_dropout", target_clusters=j)
                 tl.leiden(pop, use_rep=f"normalized_X_{tf}_dropout", target_clusters=j)
                 len_satisfies = test_all_true([len(d.obs['leiden'].unique()) <= target_clusters for d in pop.datasets])
@@ -391,7 +382,6 @@ def run_all_perturbations(pop, ad_tfs, ad_edges, K=16, multiplier=1, useX=False,
                     #newd = d.copy()
                     #d = newd
             #cluster_changes[tf] = changes
-            print('done leiden')
     if get_leiden == True:
         tfcolumns = [f'leiden_{tf}_dropout' for tf in tfs]
         new_columns_pds = [pd.DataFrame(new_columns[i], index=tfcolumns, columns=pop.datasets[i].obs_names).T for i in range(len(pop.datasets))]
@@ -408,4 +398,184 @@ def find_tf_causing_cluster(pop_ad, cluster_num):
         changes[tf_leiden] = change_num
     return changes
 
+#  The functions below were taken from CellOracle (https://github.com/morris-lab/CellOracle)
+#  and modified for our use
+def _adata_to_matrix(adata, layer_name, transpose=True):
+    """
+    Extract an numpy array from adata and returns as numpy matrix.
 
+    Args:
+        adata (anndata): anndata
+
+        layer_name (str): name of layer in anndata
+
+        trabspose (bool) : if True, it returns transposed array.
+
+    Returns:
+        2d numpy array: numpy array
+    """
+    if isinstance(adata.layers[layer_name], np.ndarray):
+        matrix = adata.layers[layer_name].copy()
+    else:
+        matrix = adata.layers[layer_name].todense().A.copy()
+
+    if transpose:
+        matrix = matrix.transpose()
+
+    return matrix.copy(order="C")
+
+def _obsm_to_matrix(adata, obsm_name, transpose=True):
+    """
+    Extract an numpy array from adata and returns as numpy matrix.
+
+    Args:
+        adata (anndata): anndata
+
+        layer_name (str): name of layer in anndata
+
+        trabspose (bool) : if True, it returns transposed array.
+
+    Returns:
+        2d numpy array: numpy array
+    """
+    if isinstance(adata.obsm[obsm_name], np.ndarray):
+        matrix = adata.obsm[obsm_name].copy()
+    else:
+        matrix = adata.obsm[obsm_name].todense().A.copy()
+
+    if transpose:
+        matrix = matrix.transpose()
+
+    return matrix.copy(order="C")
+
+def plot_background(self, embedding_name='', ax=None, s=CONFIG["s_scatter"], args=CONFIG["default_args"]):
+
+    if ax is None:
+        ax = plt
+
+    ax.scatter(self.embeddings[embedding_name].embedding[:, 0], self.embeddings[embedding_name].embedding[:, 1], c="lightgray", s=s, **args)
+
+    #ax.set_title("Pseudotime")
+    ax.axis("off")
+
+def plot_cluster_cells_use(self, embedding_name='', ax=None, s=CONFIG["s_scatter"], color=None, show_background=True, args=CONFIG["default_args"]):
+
+    if ax is None:
+        ax = plt
+
+    if s == 0:
+        color = "white"
+
+    if show_background:
+        plot_background(self=self, ax=ax, s=s, args=args)
+
+    if not hasattr(self.embeddings[embedding_name], "cell_idx_use"):
+        self.embeddings[embedding_name].cell_idx_use = None
+
+    if self.embeddings[embedding_name].cell_idx_use is None:
+        if color is None:
+            ax.scatter(self.embeddings[embedding_name].embedding[:, 0], self.embeddings[embedding_name].embedding[:, 1], c=self.colorandum, s=s, **args)
+        else:
+            ax.scatter(self.embeddings[embedding_name].embedding[:, 0], self.embeddings[embedding_name].embedding[:, 1], c=color, s=s, **args)
+
+    else:
+        if color is None:
+            ax.scatter(self.embeddings[embedding_name].embedding[self.embeddings[embedding_name].cell_idx_use, 0], self.embeddings[embedding_name].embedding[self.embeddings[embedding_name].cell_idx_use, 1],
+                       c=self.embeddings[embedding_name].colorandum[self.embeddings[embedding_name].cell_idx_use, :],s=s, **args)
+        else:
+            ax.scatter(self.embeddings[embedding_name].embedding[self.embeddings[embedding_name].cell_idx_use, 0], self.embeddings[embedding_name].embedding[self.embeddings[embedding_name].cell_idx_use, 1],
+                       c=color, s=s, **args)
+
+
+    ax.axis("off")
+
+def _get_clustercolor_from_anndata(adata, cluster_name, return_as):
+    """
+    Extract clor information from adata and returns as palette (pandas data frame) or dictionary.
+
+    Args:
+        adata (anndata): anndata
+
+        cluster_name (str): cluster name in anndata.obs
+
+        return_as (str) : "palette" or "dict"
+
+    Returns:
+        2d numpy array: numpy array
+    """
+        # return_as: "palette" or "dict"
+    def float2rgb8bit(x):
+        x = (x*255).astype("int")
+        x = tuple(x)
+
+        return x
+
+    def rgb2hex(rgb):
+        return '#%02x%02x%02x' % rgb
+
+    def float2hex(x):
+        x = float2rgb8bit(x)
+        x = rgb2hex(x)
+        return x
+
+    def hex2rgb(c):
+        return (int(c[1:3],16),int(c[3:5],16),int(c[5:7],16), 255)
+
+    pal = get_palette(adata, cluster_name)
+    if return_as=="palette":
+        return pal
+    elif return_as=="dict":
+        col_dict = {}
+        for i in pal.index:
+            col_dict[i] = np.array(hex2rgb(pal.loc[i, "palette"]))/255
+        return col_dict
+    else:
+        raise ValueErroe("return_as")
+    return 0
+
+def get_palette(adata, cname):
+    c = [i.upper() for i in adata.uns[f"{cname}_colors"]]
+    #c = sns.cubehelix_palette(24)
+    """
+    col = adata.obs[cname].unique()
+    col = list(col)
+    col.sort()
+    """
+    try:
+        col = adata.obs[cname].cat.categories
+        pal = pd.DataFrame({"palette": c}, index=col)
+    except:
+        col = adata.obs[cname].cat.categories
+        c = c[:len(col)]
+        pal = pd.DataFrame({"palette": c}, index=col)
+    return pal
+
+# this is a function to extract coef information from sklearn ensemble_model.
+def _get_coef_matrix(ensemble_model, feature_names):
+    # ensemble_model: trained ensemble model. e.g. BaggingRegressor
+    # feature_names: list or numpy array of feature names. e.g. feature_names=X_train.columns
+    feature_names = np.array(feature_names)
+    n_estimater = len(ensemble_model.estimators_features_)
+    coef_list = \
+        [pd.Series(ensemble_model.estimators_[i].coef_,
+                   index=feature_names[ensemble_model.estimators_features_[i]])\
+         for i in range(n_estimater)]
+
+    coef_df = pd.concat(coef_list, axis=1, sort=False).transpose()
+
+    return coef_df
+
+def intersect(list1, list2):
+    """
+    Intersect two list and get components that exists in both list.
+
+    Args:
+        list1 (list): input list.
+        list2 (list): input list.
+
+    Returns:
+        list: intersected list.
+
+    """
+    inter_list = list(set(list1).intersection(list2))
+    return(inter_list)

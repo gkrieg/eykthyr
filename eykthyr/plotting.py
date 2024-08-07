@@ -1,10 +1,11 @@
 
 from typing import Sequence, Union, Optional
-import celloracle as co
+# import celloracle as co
 import scanpy as sc
 import matplotlib.pyplot as plt
 
 from .eykthyr import Eykthyr
+from .embedding import Embedding
 
 
 
@@ -15,7 +16,8 @@ def paga_spatial_simulation(
 ):
     '''
     '''
-    umap_spatial_simulation(TFs,
+    umap_spatial_simulation(eykthyr,
+                            TFs,
                             [eykthyr.perturbed_X],
                             cluster_name = cluster_name,
                             )
@@ -23,7 +25,7 @@ def paga_spatial_simulation(
 def prep_paga(
     eykthyr: Eykthyr,
     groups: str,
-    ):
+):
     sc.pp.neighbors(eykthyr.perturbed_X, use_rep='normalized_X')
     sc.tl.umap(eykthyr.perturbed_X)
     sc.tl.paga(eykthyr.perturbed_X, groups=groups)
@@ -31,12 +33,68 @@ def prep_paga(
     sc.pl.draw_graph(eykthyr.perturbed_X, color=groups, legend_loc='on data')
 
 
-def umap_spatial_simulation(TFs, datasets, n_grid=40, min_masses=[.27, 0.007],
-                           scales=[30,1.2],
-                           embeddings=['spatial','X_draw_graph_fa'],
-                           n_neighbors=[20,25],
-                           cluster_name='original_leiden',
-                           show_plots=[True, True]):
+def umap_spatial_simulation(
+    eykthyr,
+    TFs, 
+    datasets, 
+    n_grid=40, 
+    min_masses=[.27, 0.007],
+    scales=[30,1.2],
+    embeddings=['spatial','X_draw_graph_fr'],
+    n_neighbors=[20,25],
+    cluster_name='original_leiden',
+    show_plots=[True, True]
+):
+
+    eykthyr.RNA.X = eykthyr.RNA.X.astype('double')
+    
+    for TF in TFs:
+        for embedding in embeddings:
+            eykthyr.embeddings[embedding] = Embedding()
+        eykthyr.estimate_transition_probs(
+                            embedding_names=embeddings,
+                            tf_name=TF,
+                            n_neighbors=n_neighbors,
+                            sampled_fraction=1
+                            )
+        eykthyr.calculate_embedding_shifts(embedding_names=embeddings, sigma_corr=0.05)
+        eykthyr.calculate_p_mass(embeddings, smooth=0.8, n_grid=n_grid, n_neighbors=n_neighbors)
+        eykthyr.calculate_mass_filter(embeddings, min_mass=min_masses, plot=False)
+        # eykthyr.suggest_mass_thresholds(n_suggestion=12)
+        for embedding, show_plot, scale in zip(embeddings, show_plots, scales):
+            if show_plot == True:
+                fig, ax = plt.subplots(1, 2,  figsize=[13, 6])
+
+                eykthyr.plot_simulation_flow_on_grid(embedding, scale=scale, ax=ax[0])
+                ax[0].set_title(f"Simulated cell identity shift vector: {TF} KO")
+
+                # Show quiver plot that was calculated with randomized graph.
+                eykthyr.plot_simulation_flow_random_on_grid(embedding, scale=scale, ax=ax[1])
+                ax[1].set_title(f"Randomized simulation vector")
+
+                plt.show()
+                
+        fig2, ax2 = plt.subplots(1,len(embeddings),figsize=[16, 6])
+        
+        for i,embedding in enumerate(embeddings):
+
+            eykthyr.plot_cluster_whole(embedding, cluster_name, ax=ax2[i], s=5)
+            eykthyr.plot_simulation_flow_on_grid(embedding, scale=scales[i], ax=ax2[i], show_background=False)
+            ax2[i].set_title(f"Simulated cell identity shift {embedding}: {TF} KO")
+
+        plt.show()
+'''
+def old_umap_spatial_simulation(TFs, 
+    datasets, 
+    n_grid=40, 
+    min_masses=[.27, 0.007],
+    scales=[30,1.2],
+    embeddings=['spatial','X_draw_graph_fa'],
+    n_neighbors=[20,25],
+    cluster_name='original_leiden',
+    show_plots=[True, True]
+):
+
     for TF in TFs:
         oracless = []
         for embedding, n in zip(embeddings, n_neighbors):
@@ -94,16 +152,13 @@ def umap_spatial_simulation(TFs, datasets, n_grid=40, min_masses=[.27, 0.007],
                 oracles[i].plot_simulation_flow_on_grid(scale=scales[j], ax=ax2[j], show_background=False)
                 ax2[j].set_title(f"Simulated cell identity shift {embedding}: {goi} KO")
 
-
-
             plt.show()
 
 def development_simulation():
-    '''
-    '''
+    
     from celloracle.applications import Gradient_calculator
     from celloracle.applications import Oracle_development_module
 
 
     return
-
+'''
