@@ -8,7 +8,6 @@ import pandas as pd
 import scanpy as sc
 from tqdm import tqdm
 
-# import celloracle as co
 CONFIG = {
     "default_args": {"lw": 0.3, "rasterized": True},
     "s_scatter": 5,
@@ -173,12 +172,9 @@ def get_intersecting(ms_nonorm, metagene_scores, k=10):
 
 
 from sklearn.ensemble import BaggingRegressor
-
-# from celloracle.utility import standard, intersect
 from sklearn.linear_model import Ridge
 
 
-# from celloracle.network.regression_models import _get_coef_matrix
 def get_edges_window(ad_ex, ad_motif, target_gene, grn, ad_pop, num_hops=1):
 
     # subset the ad_ex and ad_motif by the neighbors

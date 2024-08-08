@@ -22,7 +22,10 @@ dependencies = [
     "seaborn>=0.11.1",
     "matplotlib>=3.7.0",
     "squidpy>=1.2.3",
-    "louvain>=0.8.0"
+    "louvain>=0.8.0",
+    "popari>=0.0.72",
+    "cython>=3.0.11",
+    "velocyto>=0.17.17",
 ]
 description = "Eykthyr: Revealing transcriptional regulators of spatial gene programs"
 readme = "README.md"
