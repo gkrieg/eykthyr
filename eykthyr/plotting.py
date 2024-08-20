@@ -1,7 +1,9 @@
 from typing import Optional, Sequence, Union
 
 import matplotlib.pyplot as plt
+import numpy as np
 import scanpy as sc
+from matplotlib.colors import LinearSegmentedColormap
 
 from .embedding import Embedding
 from .eykthyr import Eykthyr
@@ -28,7 +30,7 @@ def prep_paga(
         sc.pp.neighbors(d, use_rep="normalized_X")
         sc.tl.umap(d)
         sc.tl.paga(d, groups=groups)
-        sc.tl.draw_graph(d, init_pos="X_umap", random_state=123)
+        sc.tl.draw_graph(d, init_pos="X_umap", random_state=123, layout="fr")
         sc.pl.draw_graph(d, color=groups, legend_loc="on data")
 
 
@@ -78,6 +80,9 @@ def umap_spatial_simulation(
     for embedding in embeddings:
         for dataset_num in range(len(eykthyr.perturbed_X)):
             eykthyr.embeddings[dataset_num][embedding] = Embedding()
+            eykthyr.perturbed_X[dataset_num].obsm[embedding] = (
+                eykthyr.perturbed_X[dataset_num].obsm[embedding].astype(float)
+            )
     eykthyr.estimate_transition_probs(
         embedding_names=embeddings,
         tf_name=TF,
@@ -123,7 +128,7 @@ def umap_spatial_simulation(
         len(embeddings),
         figsize=[width, height],
     )
-
+    ax2 = np.atleast_2d(ax2)
     for dataset_num in range(len(eykthyr.perturbed_X)):
         for i, embedding in enumerate(embeddings):
 
@@ -148,26 +153,33 @@ def umap_spatial_simulation(
     plt.show()
 
 
-"""
-def development_simulation(eykthyr, TFs, datasets, n_grid=40, min_masses=[1, 0.003],
-                           # scales=[50,1.1],
-                            scales=[30,0.8],
-                           embeddings=['spatial_2','X_draw_graph_fa'],
-                           n_neighbors=[20,25],
-                           show_plots=[True, True],
-                           vm=2,
-                           spotsize=40,
-                           arrow_args={},
-                           save_figs=False):
+def development_simulation(
+    eykthyr,
+    TFs,
+    n_grid=40,
+    min_masses=[1, 0.003],
+    # scales=[50,1.1],
+    scales=[30, 0.8],
+    cluster_name="original_leiden",
+    embeddings=["spatial", "X_draw_graph_fr"],
+    n_neighbors=[20, 25],
+    show_plots=[True, True],
+    vm=2,
+    spotsize=40,
+    arrow_args={},
+    save_figs=False,
+):
 
-    from celloracle.applications import Gradient_calculator
-    from celloracle.applications import Oracle_development_module
+    from .development import Pseudotime_module
+    from .pseudotime import Gradient_calculator
+
+    embedding_name = embeddings[0]
+    ips = []
 
     for TF in TFs:
         umap_spatial_simulation(
             eykthyr,
             TF,
-            datasets,
             n_grid=n_grid,
             min_masses=min_masses,
             scales=scales,
@@ -179,33 +191,51 @@ def development_simulation(eykthyr, TFs, datasets, n_grid=40, min_masses=[1, 0.0
 
         n_grid_grad = n_grid
         min_mass_grad = 1
-        gradient = Gradient_calculator(oracle_object=oracless[0][i], pseudotime_key="ventricle_distance")
+        gradient = Gradient_calculator(
+            adata=eykthyr.perturbed_X[0],
+            pseudotime_key="ventricle_distance",
+            obsm_key=embedding_name,
+        )
         gradient.calculate_p_mass(smooth=0.8, n_grid=n_grid_grad, n_neighbors=200)
         gradient.calculate_mass_filter(min_mass=min_mass_grad, plot=False)
-        gradient.transfer_data_into_grid(args={"method": "polynomial", "n_poly":7}, plot=False)
+        gradient.transfer_data_into_grid(
+            args={"method": "polynomial", "n_poly": 7},
+            plot=False,
+        )
         gradient.calculate_gradient()
-        dev = Oracle_development_module()
+
+        dev = Pseudotime_module()
         # Load development flow
         dev.load_differentiation_reference_data(gradient_object=gradient)
 
         # Load simulation result
-        dev.load_perturb_simulation_data(oracle_object=oracless[0][i])
-        my_gradient = LinearSegmentedColormap.from_list('my_gradient', (
-# Edit this gradient at https://eltos.github.io/gradient/#008837-A6DBA0-FFFFFF-A6DBA0-008837
-                                                        (0.000, (0.000, 0.533, 0.216)),
-                                                        (0.250, (0.651, 0.859, 0.627)),
-                                                        (0.500, (1.000, 1.000, 1.000)),
-                                                        (0.750, (0.651, 0.859, 0.627)),
-                                                        (1.000, (0.000, 0.533, 0.216)))
+        dev.load_perturb_simulation_data(
+            embedding_object=eykthyr.embeddings[0][embedding_name],
+        )
+        my_gradient = LinearSegmentedColormap.from_list(
+            "my_gradient",
+            (
+                # Edit this gradient at https://eltos.github.io/gradient/#008837-A6DBA0-FFFFFF-A6DBA0-008837
+                (0.000, (0.000, 0.533, 0.216)),
+                (0.250, (0.651, 0.859, 0.627)),
+                (0.500, (1.000, 1.000, 1.000)),
+                (0.750, (0.651, 0.859, 0.627)),
+                (1.000, (0.000, 0.533, 0.216)),
+            ),
         )
 
         # Calculate inner produc scores
         dev.calculate_inner_product()
         dev.calculate_digitized_ip(n_bins=10)
         fig, ax = plt.subplots(1, 1, figsize=[4, 6])
-        dev.plot_reference_flow_on_grid(ax = ax, scale=scales[0], s=spotsize, args=arrow_args)
+        dev.plot_reference_flow_on_grid(
+            ax=ax,
+            scale=scales[0],
+            s=spotsize,
+            args=arrow_args,
+        )
         if save_figs == True:
-            plt.savefig('differentiation.svg', bbox_inches='tight')
+            plt.savefig("differentiation.svg", bbox_inches="tight")
 
         fig, ax = plt.subplots(1, 2, figsize=[9, 6])
         dev.plot_inner_product_on_grid(vm=vm, s=spotsize, ax=ax[0], cmap=my_gradient)
@@ -214,20 +244,25 @@ def development_simulation(eykthyr, TFs, datasets, n_grid=40, min_masses=[1, 0.0
         dev.plot_inner_product_random_on_grid(vm=vm, s=spotsize, ax=ax[1])
         ax[1].set_title(f"PS calculated with Randomized simulation vector")
         if save_figs == True:
-            plt.savefig(f'{TF}_inner_product_abs.svg', bbox_inches='tight')
+            plt.savefig(f"{TF}_inner_product_abs.svg", bbox_inches="tight")
         plt.show()
         fig, ax = plt.subplots(figsize=[5, 6])
 
-        dev.plot_inner_product_on_grid(vm=vm, s=spotsize, ax=ax, show_background=False, cmap=my_gradient)
-        dev.plot_simulation_flow_on_grid(scale=scales[0], show_background=False, ax=ax, args=arrow_args)
+        dev.plot_inner_product_on_grid(
+            vm=vm,
+            s=spotsize,
+            ax=ax,
+            show_background=False,
+            cmap=my_gradient,
+        )
+        dev.plot_simulation_flow_on_grid(
+            scale=scales[0],
+            show_background=False,
+            ax=ax,
+            args=arrow_args,
+        )
         if save_figs == True:
-            plt.savefig(f'{TF}_inner_product.svg', bbox_inches='tight')
+            plt.savefig(f"{TF}_inner_product.svg", bbox_inches="tight")
 
-
-
-        ips.append((TF,dev.inner_product[~dev.mass_filter_simulation].sum()))
+        ips.append((TF, dev.inner_product[~dev.mass_filter_simulation].sum()))
     return ips
-
-
-    return
-"""

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Union
 
@@ -229,6 +230,7 @@ class Eykthyr(modified_VelocytoLoom):
         peak_tsvs: List[str],
         archr_dataset_names: List[str],
         motif_tsvs: List[str],
+        archr_suffix: str = "",
     ):
         """Computes TF activity across multiple RNA datasets."""
 
@@ -255,7 +257,9 @@ class Eykthyr(modified_VelocytoLoom):
             archr_name_len = len(archr_dataset_name) + 1
             tfpeaks = pd.read_csv(peak_tsv, sep=" ")
             # new_col_names = [c[archr_name_len:-2] for c in tfpeaks.columns]
-            new_col_names = [f"{c[archr_name_len:-2]}-1" for c in tfpeaks.columns]
+            new_col_names = [
+                f"{c[archr_name_len:-2]}{archr_suffix}" for c in tfpeaks.columns
+            ]
             tfpeaks.rename(
                 columns={c: new_c for c, new_c in zip(tfpeaks.columns, new_col_names)},
                 inplace=True,
@@ -291,6 +295,16 @@ class Eykthyr(modified_VelocytoLoom):
             tf_adata.layers["raw"] = tf_adata.X
             tf_adata.X -= tf_adata.X.min(axis=0)
             tf_adata.X /= tf_adata.X.max(axis=0)
+
+            if (
+                np.isnan(tf_adata.X).mean() * 100
+            ) > 90:  # More than 90% of tf_adata.X is nan
+                print(
+                    "TF activity is mostly NaN. Are you sure you have the correct archr suffix",
+                )
+                print(
+                    f"RNA obs name: {RNA.obs_names[0]}, archr obs name: {new_col_names[0]}",
+                )
             self.TF.append(tf_adata)
 
     def compute_TF_metagene_weights(
