@@ -491,6 +491,12 @@ def run_all_perturbations(
 ):
     new_columns = [[] for d in pop.datasets]
     perturbed_datasets = [d.copy() for d in pop.datasets]
+    for d in perturbed_datasets:
+        for name in ["Sigma_x_inv", "popari_hyperparameters", "losses", "sigma_yx"]:
+            if name in d.uns:
+                del d.uns[name]
+        if "adjacency_list" in d.obs.columns:
+            del d.obs["adjacency_list"]
     for pop_ad, ad_tf, ad_edge, ite in zip(
         perturbed_datasets,
         ad_tfs,
