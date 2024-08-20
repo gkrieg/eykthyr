@@ -262,7 +262,7 @@ def get_metagene_edges_window(
 
     # subset the ad_ex and ad_motif by the neighbors
     tfs = ad_motif.var_names
-    retdf = pd.DataFrame(index=tfs)
+    retdf = pd.DataFrame(index=tfs, columns=ad_ex.obs_names)
     if cluster_id != None:
         nn_indices = get_nearest_neighbors(ad_pop)
     for i, cell in tqdm(enumerate(ad_ex.obs_names)):
@@ -287,7 +287,7 @@ def get_metagene_edges_window(
         # label = ad_pop.obsm['normalized_X'][neighbors_bool,target_metagene]
         label = ad_pop.obsm["X"][neighbors_bool, target_metagene]
         model = BaggingRegressor(
-            base_estimator=Ridge(
+            estimator=Ridge(
                 alpha=1,
                 solver="auto",
                 random_state=123,
@@ -487,11 +487,12 @@ def run_all_perturbations(
     multiplier=1,
     useX=False,
     target_clusters=10,
-    get_leiden=True,
+    get_leiden=False,
 ):
     new_columns = [[] for d in pop.datasets]
+    perturbed_datasets = [d.copy() for d in pop.datasets]
     for pop_ad, ad_tf, ad_edge, ite in zip(
-        pop.datasets,
+        perturbed_datasets,
         ad_tfs,
         ad_edges,
         range(len(pop.datasets)),
@@ -509,7 +510,8 @@ def run_all_perturbations(
                 useX=useX,
             )
         # tl.leiden(pop, use_rep=f"X_{tf}_dropout", target_clusters=10)
-        if get_leiden == True:
+    if get_leiden == True:
+        for tf in tfs:
             tl.leiden(
                 pop,
                 use_rep=f"normalized_X_{tf}_dropout",
@@ -532,19 +534,9 @@ def run_all_perturbations(
                         for d in pop.datasets
                     ],
                 )
-            # if the number of clusters is more than 10, change the target number down
-            # changes = []
-            for tf in tfs:
+            for ite, pop_ad in enumerate(pop.datasets):
                 new_columns[ite].append(align_leiden(pop_ad, tf))
-                # l = (d.obs['original_leiden'] != d.obs[f'leiden_{tf}_dropout']).sum()
-                # changes.append(l)
-                # d.obs.rename(columns={'new_leiden': f'leiden_{tf}_dropout'})
-                # d.obs[f'leiden_{tf}_dropout'] = d.obs['new_leiden']
-                # if it % 50 == 0:
-                # newd = d.copy()
-                # d = newd
-            # cluster_changes[tf] = changes
-    if get_leiden == True:
+
         tfcolumns = [f"leiden_{tf}_dropout" for tf in tfs]
         new_columns_pds = [
             pd.DataFrame(
@@ -556,7 +548,7 @@ def run_all_perturbations(
         ]
         for d, ncpd in zip(pop.datasets, new_columns_pds):
             d.obs = d.obs.join(ncpd)
-    # return cluster_changes
+    return perturbed_datasets
 
 
 def find_tf_causing_cluster(pop_ad, cluster_num):
@@ -624,6 +616,7 @@ def _obsm_to_matrix(adata, obsm_name, transpose=True):
 def plot_background(
     self,
     embedding_name="",
+    dataset_num=0,
     ax=None,
     s=CONFIG["s_scatter"],
     args=CONFIG["default_args"],
@@ -633,8 +626,8 @@ def plot_background(
         ax = plt
 
     ax.scatter(
-        self.embeddings[embedding_name].embedding[:, 0],
-        self.embeddings[embedding_name].embedding[:, 1],
+        self.embeddings[dataset_num][embedding_name].embedding[:, 0],
+        self.embeddings[dataset_num][embedding_name].embedding[:, 1],
         c="lightgray",
         s=s,
         **args,
@@ -647,6 +640,7 @@ def plot_background(
 def plot_cluster_cells_use(
     self,
     embedding_name="",
+    dataset_num=0,
     ax=None,
     s=CONFIG["s_scatter"],
     color=None,
@@ -661,24 +655,24 @@ def plot_cluster_cells_use(
         color = "white"
 
     if show_background:
-        plot_background(self=self, ax=ax, s=s, args=args)
+        plot_background(self=self, dataset_num=dataset_num, ax=ax, s=s, args=args)
 
-    if not hasattr(self.embeddings[embedding_name], "cell_idx_use"):
-        self.embeddings[embedding_name].cell_idx_use = None
+    if not hasattr(self.embeddings[dataset_num][embedding_name], "cell_idx_use"):
+        self.embeddings[dataset_num][embedding_name].cell_idx_use = None
 
-    if self.embeddings[embedding_name].cell_idx_use is None:
+    if self.embeddings[dataset_num][embedding_name].cell_idx_use is None:
         if color is None:
             ax.scatter(
-                self.embeddings[embedding_name].embedding[:, 0],
-                self.embeddings[embedding_name].embedding[:, 1],
+                self.embeddings[dataset_num][embedding_name].embedding[:, 0],
+                self.embeddings[dataset_num][embedding_name].embedding[:, 1],
                 c=self.colorandum,
                 s=s,
                 **args,
             )
         else:
             ax.scatter(
-                self.embeddings[embedding_name].embedding[:, 0],
-                self.embeddings[embedding_name].embedding[:, 1],
+                self.embeddings[dataset_num][embedding_name].embedding[:, 0],
+                self.embeddings[dataset_num][embedding_name].embedding[:, 1],
                 c=color,
                 s=s,
                 **args,
@@ -687,16 +681,16 @@ def plot_cluster_cells_use(
     else:
         if color is None:
             ax.scatter(
-                self.embeddings[embedding_name].embedding[
-                    self.embeddings[embedding_name].cell_idx_use,
+                self.embeddings[dataset_num][embedding_name].embedding[
+                    self.embeddings[dataset_num][embedding_name].cell_idx_use,
                     0,
                 ],
-                self.embeddings[embedding_name].embedding[
-                    self.embeddings[embedding_name].cell_idx_use,
+                self.embeddings[dataset_num][embedding_name].embedding[
+                    self.embeddings[dataset_num][embedding_name].cell_idx_use,
                     1,
                 ],
-                c=self.embeddings[embedding_name].colorandum[
-                    self.embeddings[embedding_name].cell_idx_use,
+                c=self.embeddings[dataset_num][embedding_name].colorandum[
+                    self.embeddings[dataset_num][embedding_name].cell_idx_use,
                     :,
                 ],
                 s=s,
@@ -704,12 +698,12 @@ def plot_cluster_cells_use(
             )
         else:
             ax.scatter(
-                self.embeddings[embedding_name].embedding[
-                    self.embeddings[embedding_name].cell_idx_use,
+                self.embeddings[dataset_num][embedding_name].embedding[
+                    self.embeddings[dataset_num][embedding_name].cell_idx_use,
                     0,
                 ],
-                self.embeddings[embedding_name].embedding[
-                    self.embeddings[embedding_name].cell_idx_use,
+                self.embeddings[dataset_num][embedding_name].embedding[
+                    self.embeddings[dataset_num][embedding_name].cell_idx_use,
                     1,
                 ],
                 c=color,
