@@ -13,10 +13,9 @@ def paga_spatial_simulation(
     cluster_name: str,
 ):
     """"""
-    umap_spatial_simulation(
+    umap_spatial_simulations(
         eykthyr,
         TFs,
-        [eykthyr.perturbed_X],
         cluster_name=cluster_name,
     )
 
@@ -25,17 +24,45 @@ def prep_paga(
     eykthyr: Eykthyr,
     groups: str,
 ):
-    sc.pp.neighbors(eykthyr.perturbed_X, use_rep="normalized_X")
-    sc.tl.umap(eykthyr.perturbed_X)
-    sc.tl.paga(eykthyr.perturbed_X, groups=groups)
-    sc.tl.draw_graph(eykthyr.perturbed_X, init_pos="X_umap", random_state=123)
-    sc.pl.draw_graph(eykthyr.perturbed_X, color=groups, legend_loc="on data")
+    for d in eykthyr.perturbed_X:
+        sc.pp.neighbors(d, use_rep="normalized_X")
+        sc.tl.umap(d)
+        sc.tl.paga(d, groups=groups)
+        sc.tl.draw_graph(d, init_pos="X_umap", random_state=123)
+        sc.pl.draw_graph(d, color=groups, legend_loc="on data")
+
+
+def umap_spatial_simulations(
+    eykthyr,
+    TFs,
+    n_grid=40,
+    min_masses=[0.27, 0.007],
+    scales=[30, 1.2],
+    embeddings=["spatial", "X_draw_graph_fr"],
+    n_neighbors=[20, 25],
+    cluster_name="original_leiden",
+    show_plots=[True, True],
+):
+    for rna in eykthyr.RNA:
+        rna.X = rna.X.astype("double")
+
+    for TF in TFs:
+        umap_spatial_simulation(
+            eykthyr,
+            TF,
+            n_grid=n_grid,
+            min_masses=min_masses,
+            scales=scales,
+            embeddings=embeddings,
+            n_neighbors=n_neighbors,
+            cluster_name=cluster_name,
+            show_plots=show_plots,
+        )
 
 
 def umap_spatial_simulation(
     eykthyr,
-    TFs,
-    datasets,
+    TF,
     n_grid=40,
     min_masses=[0.27, 0.007],
     scales=[30, 1.2],
@@ -45,134 +72,161 @@ def umap_spatial_simulation(
     show_plots=[True, True],
 ):
 
-    eykthyr.RNA.X = eykthyr.RNA.X.astype("double")
-
-    for TF in TFs:
-        for embedding in embeddings:
-            eykthyr.embeddings[embedding] = Embedding()
-        eykthyr.estimate_transition_probs(
-            embedding_names=embeddings,
-            tf_name=TF,
-            n_neighbors=n_neighbors,
-            sampled_fraction=1,
-        )
-        eykthyr.calculate_embedding_shifts(embedding_names=embeddings, sigma_corr=0.05)
-        eykthyr.calculate_p_mass(
-            embeddings,
-            smooth=0.8,
-            n_grid=n_grid,
-            n_neighbors=n_neighbors,
-        )
-        eykthyr.calculate_mass_filter(embeddings, min_mass=min_masses, plot=False)
-        # eykthyr.suggest_mass_thresholds(n_suggestion=12)
-        for embedding, show_plot, scale in zip(embeddings, show_plots, scales):
+    eykthyr.embeddings = []
+    for dataset_num in range(len(eykthyr.perturbed_X)):
+        eykthyr.embeddings.append({})
+    for embedding in embeddings:
+        for dataset_num in range(len(eykthyr.perturbed_X)):
+            eykthyr.embeddings[dataset_num][embedding] = Embedding()
+    eykthyr.estimate_transition_probs(
+        embedding_names=embeddings,
+        tf_name=TF,
+        n_neighbors=n_neighbors,
+        sampled_fraction=1,
+    )
+    eykthyr.calculate_embedding_shifts(embedding_names=embeddings, sigma_corr=0.05)
+    eykthyr.calculate_p_mass(
+        embeddings,
+        smooth=0.8,
+        n_grid=n_grid,
+        n_neighbors=n_neighbors,
+    )
+    eykthyr.calculate_mass_filter(embeddings, min_mass=min_masses, plot=False)
+    # eykthyr.suggest_mass_thresholds(n_suggestion=12)
+    for embedding, show_plot, scale in zip(embeddings, show_plots, scales):
+        for dataset_num in range(len(eykthyr.perturbed_X)):
             if show_plot == True:
                 fig, ax = plt.subplots(1, 2, figsize=[13, 6])
 
-                eykthyr.plot_simulation_flow_on_grid(embedding, scale=scale, ax=ax[0])
+                eykthyr.plot_simulation_flow_on_grid(
+                    embedding,
+                    dataset_num,
+                    scale=scale,
+                    ax=ax[0],
+                )
                 ax[0].set_title(f"Simulated cell identity shift vector: {TF} KO")
 
                 # Show quiver plot that was calculated with randomized graph.
                 eykthyr.plot_simulation_flow_random_on_grid(
                     embedding,
+                    dataset_num,
                     scale=scale,
                     ax=ax[1],
                 )
                 ax[1].set_title(f"Randomized simulation vector")
 
                 plt.show()
+    width = 8 * len(embeddings)
+    height = 6 * len(eykthyr.perturbed_X)
+    fig2, ax2 = plt.subplots(
+        len(eykthyr.perturbed_X),
+        len(embeddings),
+        figsize=[width, height],
+    )
 
-        fig2, ax2 = plt.subplots(1, len(embeddings), figsize=[16, 6])
-
+    for dataset_num in range(len(eykthyr.perturbed_X)):
         for i, embedding in enumerate(embeddings):
 
-            eykthyr.plot_cluster_whole(embedding, cluster_name, ax=ax2[i], s=5)
+            eykthyr.plot_cluster_whole(
+                embedding,
+                cluster_name,
+                dataset_num,
+                ax=ax2[dataset_num][i],
+                s=5,
+            )
             eykthyr.plot_simulation_flow_on_grid(
                 embedding,
+                dataset_num,
                 scale=scales[i],
-                ax=ax2[i],
+                ax=ax2[dataset_num][i],
                 show_background=False,
             )
-            ax2[i].set_title(f"Simulated cell identity shift {embedding}: {TF} KO")
+            ax2[dataset_num][i].set_title(
+                f"Simulated cell identity shift {embedding}: {TF} KO",
+            )
 
-        plt.show()
+    plt.show()
 
 
 """
-def old_umap_spatial_simulation(TFs,
-    datasets,
-    n_grid=40,
-    min_masses=[.27, 0.007],
-    scales=[30,1.2],
-    embeddings=['spatial','X_draw_graph_fa'],
-    n_neighbors=[20,25],
-    cluster_name='original_leiden',
-    show_plots=[True, True]
-):
-
-    for TF in TFs:
-        oracless = []
-        for embedding, n in zip(embeddings, n_neighbors):
-            oracles = []
-            for d in datasets:
-
-                oracle = co.Oracle()
-                oracle.import_anndata_as_raw_count(adata=d,
-                                   cluster_column_name=cluster_name,
-                                   embedding_name=embedding)
-                oracles.append(oracle)
-            oracless.append(oracles)
-
-
-            for oracle in oracles:
-                oracle.adata.X = oracle.adata.X.astype('double')
-                oracle.adata.layers['imputed_count'] = oracle.adata.obsm[f'normalized_X_{TF}_dropout'].astype('double')
-                oracle.adata.layers['delta_X'] =  oracle.adata.obsm[
-                                        f'normalized_X_{TF}_dropout'] - oracle.adata.obsm['normalized_X']
-                oracle.estimate_transition_prob(
-                                n_neighbors=n,
-                                sampled_fraction=1
-                                )
-                oracle.calculate_embedding_shift(sigma_corr=0.05)
-
-
-
-        for i in range(1):
-            for j,oracles in enumerate(oracless):
-
-
-                goi = TF
-                # Show quiver plot
-
-                oracles[i].calculate_p_mass(smooth=0.8, n_grid=n_grid, n_neighbors=n_neighbors[j])
-#                 oracles[i].suggest_mass_thresholds(n_suggestion=12)
-                oracles[i].calculate_mass_filter(min_mass=min_masses[j], plot=False)
-                if show_plots[j] == True:
-                    fig, ax = plt.subplots(1, 2,  figsize=[13, 6])
-
-                    oracles[i].plot_simulation_flow_on_grid(scale=scales[j], ax=ax[0])
-                    ax[0].set_title(f"Simulated cell identity shift vector: {goi} KO")
-
-                    # Show quiver plot that was calculated with randomized graph.
-                    oracles[i].plot_simulation_flow_random_on_grid(scale=scales[j], ax=ax[1])
-                    ax[1].set_title(f"Randomized simulation vector")
-
-                    plt.show()
-
-        # Plot vector field with cell cluster
-            fig2, ax2 = plt.subplots(1,len(embeddings),figsize=[16, 6])
-            for oracles, embedding, j in zip(oracless, embeddings, range(len(oracless))):
-
-                oracles[i].plot_cluster_whole(ax=ax2[j], s=5)
-                oracles[i].plot_simulation_flow_on_grid(scale=scales[j], ax=ax2[j], show_background=False)
-                ax2[j].set_title(f"Simulated cell identity shift {embedding}: {goi} KO")
-
-            plt.show()
-
-def development_simulation():
+def development_simulation(eykthyr, TFs, datasets, n_grid=40, min_masses=[1, 0.003],
+                           # scales=[50,1.1],
+                            scales=[30,0.8],
+                           embeddings=['spatial_2','X_draw_graph_fa'],
+                           n_neighbors=[20,25],
+                           show_plots=[True, True],
+                           vm=2,
+                           spotsize=40,
+                           arrow_args={},
+                           save_figs=False):
 
     from celloracle.applications import Gradient_calculator
     from celloracle.applications import Oracle_development_module
+
+    for TF in TFs:
+        umap_spatial_simulation(
+            eykthyr,
+            TF,
+            datasets,
+            n_grid=n_grid,
+            min_masses=min_masses,
+            scales=scales,
+            embeddings=embeddings,
+            n_neighbors=n_neighbors,
+            cluster_name=cluster_name,
+            show_plots=show_plots,
+        )
+
+        n_grid_grad = n_grid
+        min_mass_grad = 1
+        gradient = Gradient_calculator(oracle_object=oracless[0][i], pseudotime_key="ventricle_distance")
+        gradient.calculate_p_mass(smooth=0.8, n_grid=n_grid_grad, n_neighbors=200)
+        gradient.calculate_mass_filter(min_mass=min_mass_grad, plot=False)
+        gradient.transfer_data_into_grid(args={"method": "polynomial", "n_poly":7}, plot=False)
+        gradient.calculate_gradient()
+        dev = Oracle_development_module()
+        # Load development flow
+        dev.load_differentiation_reference_data(gradient_object=gradient)
+
+        # Load simulation result
+        dev.load_perturb_simulation_data(oracle_object=oracless[0][i])
+        my_gradient = LinearSegmentedColormap.from_list('my_gradient', (
+# Edit this gradient at https://eltos.github.io/gradient/#008837-A6DBA0-FFFFFF-A6DBA0-008837
+                                                        (0.000, (0.000, 0.533, 0.216)),
+                                                        (0.250, (0.651, 0.859, 0.627)),
+                                                        (0.500, (1.000, 1.000, 1.000)),
+                                                        (0.750, (0.651, 0.859, 0.627)),
+                                                        (1.000, (0.000, 0.533, 0.216)))
+        )
+
+        # Calculate inner produc scores
+        dev.calculate_inner_product()
+        dev.calculate_digitized_ip(n_bins=10)
+        fig, ax = plt.subplots(1, 1, figsize=[4, 6])
+        dev.plot_reference_flow_on_grid(ax = ax, scale=scales[0], s=spotsize, args=arrow_args)
+        if save_figs == True:
+            plt.savefig('differentiation.svg', bbox_inches='tight')
+
+        fig, ax = plt.subplots(1, 2, figsize=[9, 6])
+        dev.plot_inner_product_on_grid(vm=vm, s=spotsize, ax=ax[0], cmap=my_gradient)
+        ax[0].set_title(f"PS")
+
+        dev.plot_inner_product_random_on_grid(vm=vm, s=spotsize, ax=ax[1])
+        ax[1].set_title(f"PS calculated with Randomized simulation vector")
+        if save_figs == True:
+            plt.savefig(f'{TF}_inner_product_abs.svg', bbox_inches='tight')
+        plt.show()
+        fig, ax = plt.subplots(figsize=[5, 6])
+
+        dev.plot_inner_product_on_grid(vm=vm, s=spotsize, ax=ax, show_background=False, cmap=my_gradient)
+        dev.plot_simulation_flow_on_grid(scale=scales[0], show_background=False, ax=ax, args=arrow_args)
+        if save_figs == True:
+            plt.savefig(f'{TF}_inner_product.svg', bbox_inches='tight')
+
+
+
+        ips.append((TF,dev.inner_product[~dev.mass_filter_simulation].sum()))
+    return ips
 
 
     return

@@ -102,36 +102,38 @@ class modified_VelocytoLoom:
         min_mass=itertools.repeat(0.01),
         plot=False,
     ):
-        for i, embedding_name in enumerate(embedding_names):
-            self.embeddings[embedding_name].min_mass = min_mass[i]
-            self.embeddings[embedding_name].mass_filter = (
-                self.embeddings[embedding_name].total_p_mass < min_mass[i]
-            )
-
-            if plot:
-                fig, ax = plt.subplots(figsize=[5, 5])
-
-                # ax_.scatter(gridpoints_coordinates[mass_filter, 0], gridpoints_coordinates[mass_filter, 1], s=0)
-                ax.scatter(
-                    self.embeddings[embedding_name].embedding[:, 0],
-                    self.embeddings[embedding_name].embedding[:, 1],
-                    c="lightgray",
-                    s=10,
+        for dataset_num in range(len(self.perturbed_X)):
+            for i, embedding_name in enumerate(embedding_names):
+                self.embeddings[dataset_num][embedding_name].min_mass = min_mass[i]
+                self.embeddings[dataset_num][embedding_name].mass_filter = (
+                    self.embeddings[dataset_num][embedding_name].total_p_mass
+                    < min_mass[i]
                 )
-                ax.scatter(
-                    self.embeddings[embedding_name].flow_grid[
-                        ~self.embeddings[embedding_name].mass_filter,
-                        0,
-                    ],
-                    self.embeddings[embedding_name].flow_grid[
-                        ~self.embeddings[embedding_name].mass_filter,
-                        1,
-                    ],
-                    c="black",
-                    s=0.5,
-                )
-                ax.set_title("Grid points selected")
-                ax.axis("off")
+
+                if plot:
+                    fig, ax = plt.subplots(figsize=[5, 5])
+
+                    # ax_.scatter(gridpoints_coordinates[mass_filter, 0], gridpoints_coordinates[mass_filter, 1], s=0)
+                    ax.scatter(
+                        self.embeddings[dataset_num][embedding_name].embedding[:, 0],
+                        self.embeddings[dataset_num][embedding_name].embedding[:, 1],
+                        c="lightgray",
+                        s=10,
+                    )
+                    ax.scatter(
+                        self.embeddings[dataset_num][embedding_name].flow_grid[
+                            ~self.embeddings[dataset_num][embedding_name].mass_filter,
+                            0,
+                        ],
+                        self.embeddings[dataset_num][embedding_name].flow_grid[
+                            ~self.embeddings[dataset_num][embedding_name].mass_filter,
+                            1,
+                        ],
+                        c="black",
+                        s=0.5,
+                    )
+                    ax.set_title("Grid points selected")
+                    ax.axis("off")
 
     """
     ## Get randomized GRN coef to do randomized perturbation simulation
@@ -167,6 +169,7 @@ class modified_VelocytoLoom:
         self,
         embedding_name="",
         cluster_name="",
+        dataset_num=0,
         ax=None,
         s=CONFIG["s_scatter"],
         args=CONFIG["default_args"],
@@ -175,20 +178,26 @@ class modified_VelocytoLoom:
         if ax is None:
             ax = plt
 
+        if not hasattr(self, "colorandum"):
+            self.colorandum = []
+
         # update color information
+        print(dataset_num)
         col_dict = _get_clustercolor_from_anndata(
-            adata=self.perturbed_X,
+            adata=self.perturbed_X[dataset_num],
             cluster_name=cluster_name,
             return_as="dict",
         )
-        self.colorandum = np.array(
-            [col_dict[i] for i in self.perturbed_X.obs[cluster_name]],
+        self.colorandum.append(
+            np.array(
+                [col_dict[i] for i in self.perturbed_X[dataset_num].obs[cluster_name]],
+            ),
         )
 
-        c = self.colorandum
+        c = self.colorandum[dataset_num]
         ax.scatter(
-            self.embeddings[embedding_name].embedding[:, 0],
-            self.embeddings[embedding_name].embedding[:, 1],
+            self.embeddings[dataset_num][embedding_name].embedding[:, 0],
+            self.embeddings[dataset_num][embedding_name].embedding[:, 1],
             c=c,
             s=s,
             **args,
@@ -198,6 +207,7 @@ class modified_VelocytoLoom:
     def plot_simulation_flow_on_grid(
         self,
         embedding_name,
+        dataset_num,
         ax=None,
         scale=CONFIG["scale_simulation"],
         show_background=True,
@@ -206,6 +216,7 @@ class modified_VelocytoLoom:
     ):
         self._plot_simulation_flow_on_grid(
             embedding_name=embedding_name,
+            dataset_num=dataset_num,
             ax=ax,
             scale=scale,
             show_background=show_background,
@@ -217,6 +228,7 @@ class modified_VelocytoLoom:
     def plot_simulation_flow_random_on_grid(
         self,
         embedding_name,
+        dataset_num,
         ax=None,
         scale=CONFIG["scale_simulation"],
         show_background=True,
@@ -225,6 +237,7 @@ class modified_VelocytoLoom:
     ):
         self._plot_simulation_flow_on_grid(
             embedding_name=embedding_name,
+            dataset_num=dataset_num,
             ax=ax,
             scale=scale,
             show_background=show_background,
@@ -236,6 +249,7 @@ class modified_VelocytoLoom:
     def _plot_simulation_flow_on_grid(
         self,
         embedding_name="",
+        dataset_num=0,
         ax=None,
         scale=CONFIG["scale_simulation"],
         show_background=True,
@@ -251,6 +265,7 @@ class modified_VelocytoLoom:
             plot_background(
                 self=self,
                 embedding_name=embedding_name,
+                dataset_num=dataset_num,
                 ax=ax,
                 s=s,
                 args=CONFIG["default_args"],
@@ -259,6 +274,7 @@ class modified_VelocytoLoom:
             plot_cluster_cells_use(
                 self=self,
                 embedding_name=embedding_name,
+                dataset_num=dataset_num,
                 ax=ax,
                 s=0,
                 color=None,
@@ -267,24 +283,34 @@ class modified_VelocytoLoom:
             )
 
         # mass filter selection
-        if hasattr(self.embeddings[embedding_name], "mass_filter_simulation"):
-            mass_filter = self.embeddings[embedding_name].mass_filter_simulation
-        elif hasattr(self.embeddings[embedding_name], "mass_filter"):
-            mass_filter = self.embeddings[embedding_name].mass_filter
+        if hasattr(
+            self.embeddings[dataset_num][embedding_name],
+            "mass_filter_simulation",
+        ):
+            mass_filter = self.embeddings[dataset_num][
+                embedding_name
+            ].mass_filter_simulation
+        elif hasattr(self.embeddings[dataset_num][embedding_name], "mass_filter"):
+            mass_filter = self.embeddings[dataset_num][embedding_name].mass_filter
 
         # Gridpoint cordinate selection
-        if hasattr(self.embeddings[embedding_name], "gridpoints_coordinates"):
-            gridpoints_coordinates = self.embeddings[
+        if hasattr(
+            self.embeddings[dataset_num][embedding_name],
+            "gridpoints_coordinates",
+        ):
+            gridpoints_coordinates = self.embeddings[dataset_num][
                 embedding_name
             ].gridpoints_coordinates
-        elif hasattr(self.embeddings[embedding_name], "mass_filter"):
-            gridpoints_coordinates = self.embeddings[embedding_name].flow_grid
+        elif hasattr(self.embeddings[dataset_num][embedding_name], "mass_filter"):
+            gridpoints_coordinates = self.embeddings[dataset_num][
+                embedding_name
+            ].flow_grid
 
         # Arrow selection
         if data_random:
-            flow = self.embeddings[embedding_name].flow_rndm
+            flow = self.embeddings[dataset_num][embedding_name].flow_rndm
         else:
-            flow = self.embeddings[embedding_name].flow
+            flow = self.embeddings[dataset_num][embedding_name].flow
 
         ax.quiver(
             gridpoints_coordinates[~mass_filter, 0],
@@ -636,155 +662,201 @@ class modified_VelocytoLoom:
 
         numba_random_seed(random_seed)
 
-        X = _obsm_to_matrix(
-            self.perturbed_X,
-            f"normalized_X_{tf_name}_dropout",
-        )  # [:, :ndims]
-        delta_X = X - _obsm_to_matrix(self.perturbed_X, "normalized_X")
-        embedding = self.perturbed_X.obsm[embedding_name]
-        self.embeddings[embedding_name].embedding = embedding
+        for dataset_num in range(len(self.perturbed_X)):
 
-        if n_neighbors is None:
-            n_neighbors = int(self.perturbed_X.shape[0] / 5)
+            X = _obsm_to_matrix(
+                self.perturbed_X[dataset_num],
+                f"normalized_X_{tf_name}_dropout",
+            )  # [:, :ndims]
+            delta_X = X - _obsm_to_matrix(self.perturbed_X[dataset_num], "normalized_X")
+            embedding = self.perturbed_X[dataset_num].obsm[embedding_name]
+            self.embeddings[dataset_num][embedding_name].embedding = embedding
 
-        if knn_random:
-            np.random.seed(random_seed)
-            self.corr_calc = "knn_random"
+            if n_neighbors is None:
+                n_neighbors = int(self.perturbed_X[dataset_num].shape[0] / 5)
 
-            if calculate_randomized:
-                delta_X_rndm = np.copy(delta_X)
-                permute_rows_nsign(delta_X_rndm)
+            if knn_random:
+                np.random.seed(random_seed)
+                self.corr_calc = "knn_random"
 
-            logging.debug("Calculate KNN in the embedding space")
+                if calculate_randomized:
+                    delta_X_rndm = np.copy(delta_X)
+                    permute_rows_nsign(delta_X_rndm)
 
-            if cell_idx_use is None:
-                nn = NearestNeighbors(n_neighbors=n_neighbors + 1, n_jobs=n_jobs)
-                nn.fit(embedding)  # NOTE should support knn in high dimensions
-                self.embeddings[embedding_name].embedding_knn = nn.kneighbors_graph(
-                    mode="connectivity",
+                logging.debug("Calculate KNN in the embedding space")
+
+                if cell_idx_use is None:
+                    nn = NearestNeighbors(n_neighbors=n_neighbors + 1, n_jobs=n_jobs)
+                    nn.fit(embedding)  # NOTE should support knn in high dimensions
+                    self.embeddings[dataset_num][embedding_name].embedding_knn = (
+                        nn.kneighbors_graph(
+                            mode="connectivity",
+                        )
+                    )
+
+                else:
+                    self.embeddings[dataset_num][embedding_name].embedding_knn = (
+                        calculate_embedding_knn_with_cell_idx(
+                            embedding_original=self.embeddings[dataset_num][
+                                embedding_name
+                            ].embedding,
+                            cell_idx_use=cell_idx_use,
+                            n_neighbors=n_neighbors,
+                            n_jobs=n_jobs,
+                        )
+                    )
+
+                # Pick random neighbours and prune the rest
+                neigh_ixs = self.embeddings[dataset_num][
+                    embedding_name
+                ].embedding_knn.indices.reshape(
+                    (-1, n_neighbors + 1),
                 )
+                p = np.linspace(
+                    sampling_probs[0],
+                    sampling_probs[1],
+                    neigh_ixs.shape[1],
+                )
+                p = p / p.sum()
 
-            else:
-                self.embeddings[embedding_name].embedding_knn = (
-                    calculate_embedding_knn_with_cell_idx(
-                        embedding_original=self.embeddings[embedding_name].embedding,
-                        cell_idx_use=cell_idx_use,
-                        n_neighbors=n_neighbors,
-                        n_jobs=n_jobs,
+                # There was a problem of API consistency because the random.choice can pick the diagonal value (or not)
+                # resulting self.corrcoeff with different number of nonzero entry per row.
+                # Not updated yet not to break previous analyses
+                # Fix is substituting below `neigh_ixs.shape[1]` with `np.arange(1,neigh_ixs.shape[1]-1)`
+                # I change it here since I am doing some breaking changes
+                sampling_ixs = np.stack(
+                    [
+                        np.random.choice(
+                            neigh_ixs.shape[1],
+                            size=(int(sampled_fraction * (n_neighbors + 1)),),
+                            replace=False,
+                            p=p,
+                        )
+                        for i in range(neigh_ixs.shape[0])
+                    ],
+                    0,
+                )
+                self.embeddings[dataset_num][embedding_name].sampling_ixs = sampling_ixs
+                neigh_ixs = neigh_ixs[
+                    np.arange(neigh_ixs.shape[0])[:, None],
+                    sampling_ixs,
+                ]
+                nonzero = neigh_ixs.shape[0] * neigh_ixs.shape[1]
+                self.embeddings[dataset_num][embedding_name].embedding_knn = (
+                    sparse.csr_matrix(
+                        (
+                            np.ones(nonzero),
+                            neigh_ixs.ravel(),
+                            np.arange(0, nonzero + 1, neigh_ixs.shape[1]),
+                        ),
+                        shape=(
+                            neigh_ixs.shape[0],
+                            neigh_ixs.shape[0],
+                        ),
                     )
                 )
 
-            # Pick random neighbours and prune the rest
-            neigh_ixs = self.embeddings[embedding_name].embedding_knn.indices.reshape(
-                (-1, n_neighbors + 1),
-            )
-            p = np.linspace(sampling_probs[0], sampling_probs[1], neigh_ixs.shape[1])
-            p = p / p.sum()
+                logging.debug(f"Correlation Calculation '{self.corr_calc}'")
 
-            # There was a problem of API consistency because the random.choice can pick the diagonal value (or not)
-            # resulting self.corrcoeff with different number of nonzero entry per row.
-            # Not updated yet not to break previous analyses
-            # Fix is substituting below `neigh_ixs.shape[1]` with `np.arange(1,neigh_ixs.shape[1]-1)`
-            # I change it here since I am doing some breaking changes
-            sampling_ixs = np.stack(
-                [
-                    np.random.choice(
-                        neigh_ixs.shape[1],
-                        size=(int(sampled_fraction * (n_neighbors + 1)),),
-                        replace=False,
-                        p=p,
+                ###
+                ###
+                self.embeddings[dataset_num][embedding_name].corrcoef = (
+                    colDeltaCorpartial(
+                        X,
+                        delta_X,
+                        neigh_ixs,
+                        threads=threads,
                     )
-                    for i in range(neigh_ixs.shape[0])
-                ],
-                0,
-            )
-            self.embeddings[embedding_name].sampling_ixs = sampling_ixs
-            neigh_ixs = neigh_ixs[np.arange(neigh_ixs.shape[0])[:, None], sampling_ixs]
-            nonzero = neigh_ixs.shape[0] * neigh_ixs.shape[1]
-            self.embeddings[embedding_name].embedding_knn = sparse.csr_matrix(
-                (
-                    np.ones(nonzero),
-                    neigh_ixs.ravel(),
-                    np.arange(0, nonzero + 1, neigh_ixs.shape[1]),
-                ),
-                shape=(
-                    neigh_ixs.shape[0],
-                    neigh_ixs.shape[0],
-                ),
-            )
-
-            logging.debug(f"Correlation Calculation '{self.corr_calc}'")
-
-            ###
-            ###
-            self.embeddings[embedding_name].corrcoef = colDeltaCorpartial(
-                X,
-                delta_X,
-                neigh_ixs,
-                threads=threads,
-            )
-            if calculate_randomized:
-                logging.debug(f"Correlation Calculation for negative control")
-                self.embeddings[embedding_name].corrcoef_random = colDeltaCorpartial(
-                    X,
-                    delta_X_rndm,
-                    neigh_ixs,
-                    threads=threads,
                 )
-            ######
+                if calculate_randomized:
+                    logging.debug(f"Correlation Calculation for negative control")
+                    self.embeddings[dataset_num][embedding_name].corrcoef_random = (
+                        colDeltaCorpartial(
+                            X,
+                            delta_X_rndm,
+                            neigh_ixs,
+                            threads=threads,
+                        )
+                    )
+                ######
 
-            if np.any(np.isnan(self.embeddings[embedding_name].corrcoef)):
-                self.embeddings[embedding_name].corrcoef[
-                    np.isnan(self.embeddings[embedding_name].corrcoef)
-                ] = 1
-                logging.debug(
-                    "Nans encountered in corrcoef and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.",
-                )
-                # logging.warning("Nans encountered in corrcoef and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.")
-            if calculate_randomized:
-                np.fill_diagonal(self.embeddings[embedding_name].corrcoef_random, 0)
-                if np.any(np.isnan(self.embeddings[embedding_name].corrcoef_random)):
-                    self.embeddings[embedding_name].corrcoef_random[
-                        np.isnan(self.embeddings[embedding_name].corrcoef_random)
+                if np.any(
+                    np.isnan(self.embeddings[dataset_num][embedding_name].corrcoef),
+                ):
+                    self.embeddings[dataset_num][embedding_name].corrcoef[
+                        np.isnan(self.embeddings[dataset_num][embedding_name].corrcoef)
                     ] = 1
-                    # logging.warning("Nans encountered in corrcoef and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.")
                     logging.debug(
-                        "Nans encountered in corrcoef_random and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.",
+                        "Nans encountered in corrcoef and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.",
                     )
-            logging.debug(f"Done Correlation Calculation")
-        else:
-            self.corr_calc = "full"
+                    # logging.warning("Nans encountered in corrcoef and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.")
+                if calculate_randomized:
+                    np.fill_diagonal(
+                        self.embeddings[dataset_num][embedding_name].corrcoef_random,
+                        0,
+                    )
+                    if np.any(
+                        np.isnan(
+                            self.embeddings[dataset_num][
+                                embedding_name
+                            ].corrcoef_random,
+                        ),
+                    ):
+                        self.embeddings[dataset_num][embedding_name].corrcoef_random[
+                            np.isnan(
+                                self.embeddings[dataset_num][
+                                    embedding_name
+                                ].corrcoef_random,
+                            )
+                        ] = 1
+                        # logging.warning("Nans encountered in corrcoef and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.")
+                        logging.debug(
+                            "Nans encountered in corrcoef_random and corrected to 1s. If not identical cells were present it is probably a small isolated cluster converging after imputation.",
+                        )
+                logging.debug(f"Done Correlation Calculation")
+            else:
+                self.corr_calc = "full"
 
-            if calculate_randomized:
-                delta_X_rndm = np.copy(delta_X)
-                permute_rows_nsign(delta_X_rndm)
+                if calculate_randomized:
+                    delta_X_rndm = np.copy(delta_X)
+                    permute_rows_nsign(delta_X_rndm)
 
-            logging.debug("Calculate KNN in the embedding space")
-            nn = NearestNeighbors(n_neighbors=n_neighbors + 1, n_jobs=n_jobs)
-            nn.fit(embedding)
-            self.embeddings[embedding_name].embedding_knn = nn.kneighbors_graph(
-                mode="connectivity",
-            )
-
-            logging.debug("Correlation Calculation 'full'")
-            #####
-            self.embeddings[embedding_name].corrcoef = colDeltaCor(
-                X,
-                delta_X,
-                threads=threads,
-            )
-            if calculate_randomized:
-                logging.debug(f"Correlation Calculation for negative control")
-                self.embeddings[embedding_name].corrcoef_random = colDeltaCor(
-                    X,
-                    delta_X_rndm,
-                    threads=threads,
+                logging.debug("Calculate KNN in the embedding space")
+                nn = NearestNeighbors(n_neighbors=n_neighbors + 1, n_jobs=n_jobs)
+                nn.fit(embedding)
+                self.embeddings[dataset_num][embedding_name].embedding_knn = (
+                    nn.kneighbors_graph(
+                        mode="connectivity",
+                    )
                 )
 
-            #####
-            np.fill_diagonal(self.embeddings[embedding_name].corrcoef, 0)
-            if calculate_randomized:
-                np.fill_diagonal(self.embeddings[embedding_name].corrcoef_random, 0)
+                logging.debug("Correlation Calculation 'full'")
+                #####
+                self.embeddings[dataset_num][embedding_name].corrcoef = colDeltaCor(
+                    X,
+                    delta_X,
+                    threads=threads,
+                )
+                if calculate_randomized:
+                    logging.debug(f"Correlation Calculation for negative control")
+                    self.embeddings[dataset_num][embedding_name].corrcoef_random = (
+                        colDeltaCor(
+                            X,
+                            delta_X_rndm,
+                            threads=threads,
+                        )
+                    )
+
+                #####
+                np.fill_diagonal(
+                    self.embeddings[dataset_num][embedding_name].corrcoef,
+                    0,
+                )
+                if calculate_randomized:
+                    np.fill_diagonal(
+                        self.embeddings[dataset_num][embedding_name].corrcoef_random,
+                        0,
+                    )
 
     ############
     def calculate_embedding_shifts(
@@ -825,57 +897,94 @@ class modified_VelocytoLoom:
 
         # NOTE maybe sparse matrix here are slower than dense
         # NOTE if knn_random this could be made much faster either using sparse matrix or neigh_ixs
-        self.embeddings[embedding_name].transition_prob = (
-            np.exp(self.embeddings[embedding_name].corrcoef / sigma_corr)
-            * self.embeddings[embedding_name].embedding_knn.todense().A
-        )  # naive
-        self.embeddings[embedding_name].transition_prob /= self.embeddings[
-            embedding_name
-        ].transition_prob.sum(1)[:, None]
-        if hasattr(self.embeddings[embedding_name], "corrcoef_random"):
-            logging.debug("Calculate transition probability for negative control")
-            self.embeddings[embedding_name].transition_prob_random = (
-                np.exp(self.embeddings[embedding_name].corrcoef_random / sigma_corr)
-                * self.embeddings[embedding_name].embedding_knn.todense().A
+
+        for dataset_num in range(len(self.perturbed_X)):
+
+            self.embeddings[dataset_num][embedding_name].transition_prob = (
+                np.exp(
+                    self.embeddings[dataset_num][embedding_name].corrcoef / sigma_corr,
+                )
+                * self.embeddings[dataset_num][embedding_name].embedding_knn.todense().A
             )  # naive
-            self.embeddings[embedding_name].transition_prob_random /= self.embeddings[
+            self.embeddings[dataset_num][
                 embedding_name
-            ].transition_prob_random.sum(1)[:, None]
+            ].transition_prob /= self.embeddings[dataset_num][
+                embedding_name
+            ].transition_prob.sum(
+                1,
+            )[
+                :,
+                None,
+            ]
+            if hasattr(self.embeddings[dataset_num][embedding_name], "corrcoef_random"):
+                logging.debug("Calculate transition probability for negative control")
+                self.embeddings[dataset_num][embedding_name].transition_prob_random = (
+                    np.exp(
+                        self.embeddings[dataset_num][embedding_name].corrcoef_random
+                        / sigma_corr,
+                    )
+                    * self.embeddings[dataset_num][embedding_name]
+                    .embedding_knn.todense()
+                    .A
+                )  # naive
+                self.embeddings[dataset_num][
+                    embedding_name
+                ].transition_prob_random /= self.embeddings[dataset_num][
+                    embedding_name
+                ].transition_prob_random.sum(
+                    1,
+                )[
+                    :,
+                    None,
+                ]
 
-        unitary_vectors = (
-            self.embeddings[embedding_name].embedding.T[:, None, :]
-            - self.embeddings[embedding_name].embedding.T[:, :, None]
-        )  # shape (2,ncells,ncells)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            unitary_vectors /= np.linalg.norm(
-                unitary_vectors,
-                ord=2,
-                axis=0,
-            )  # divide by L2
-            np.fill_diagonal(unitary_vectors[0, ...], 0)  # fix nans
-            np.fill_diagonal(unitary_vectors[1, ...], 0)
+            unitary_vectors = (
+                self.embeddings[dataset_num][embedding_name].embedding.T[:, None, :]
+                - self.embeddings[dataset_num][embedding_name].embedding.T[:, :, None]
+            )  # shape (2,ncells,ncells)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                unitary_vectors /= np.linalg.norm(
+                    unitary_vectors,
+                    ord=2,
+                    axis=0,
+                )  # divide by L2
+                np.fill_diagonal(unitary_vectors[0, ...], 0)  # fix nans
+                np.fill_diagonal(unitary_vectors[1, ...], 0)
 
-        self.embeddings[embedding_name].delta_embedding = (
-            self.embeddings[embedding_name].transition_prob * unitary_vectors
-        ).sum(2)
-        self.embeddings[embedding_name].delta_embedding -= (
-            self.embeddings[embedding_name].embedding_knn.todense().A * unitary_vectors
-        ).sum(2) / self.embeddings[embedding_name].embedding_knn.sum(1).A.T
-        self.embeddings[embedding_name].delta_embedding = self.embeddings[
-            embedding_name
-        ].delta_embedding.T
-
-        if hasattr(self.embeddings[embedding_name], "corrcoef_random"):
-            self.embeddings[embedding_name].delta_embedding_random = (
-                self.embeddings[embedding_name].transition_prob_random * unitary_vectors
-            ).sum(2)
-            self.embeddings[embedding_name].delta_embedding_random -= (
-                self.embeddings[embedding_name].embedding_knn.todense().A
+            self.embeddings[dataset_num][embedding_name].delta_embedding = (
+                self.embeddings[dataset_num][embedding_name].transition_prob
                 * unitary_vectors
-            ).sum(2) / self.embeddings[embedding_name].embedding_knn.sum(1).A.T
-            self.embeddings[embedding_name].delta_embedding_random = self.embeddings[
-                embedding_name
-            ].delta_embedding_random.T
+            ).sum(2)
+            self.embeddings[dataset_num][embedding_name].delta_embedding -= (
+                self.embeddings[dataset_num][embedding_name].embedding_knn.todense().A
+                * unitary_vectors
+            ).sum(2) / self.embeddings[dataset_num][embedding_name].embedding_knn.sum(
+                1,
+            ).A.T
+            self.embeddings[dataset_num][embedding_name].delta_embedding = (
+                self.embeddings[dataset_num][embedding_name].delta_embedding.T
+            )
+
+            if hasattr(self.embeddings[dataset_num][embedding_name], "corrcoef_random"):
+                self.embeddings[dataset_num][embedding_name].delta_embedding_random = (
+                    self.embeddings[dataset_num][embedding_name].transition_prob_random
+                    * unitary_vectors
+                ).sum(2)
+                self.embeddings[dataset_num][embedding_name].delta_embedding_random -= (
+                    self.embeddings[dataset_num][embedding_name]
+                    .embedding_knn.todense()
+                    .A
+                    * unitary_vectors
+                ).sum(2) / self.embeddings[dataset_num][
+                    embedding_name
+                ].embedding_knn.sum(
+                    1,
+                ).A.T
+                self.embeddings[dataset_num][embedding_name].delta_embedding_random = (
+                    self.embeddings[dataset_num][
+                        embedding_name
+                    ].delta_embedding_random.T
+                )
 
     def calculate_grid_arrows(
         self,
@@ -925,78 +1034,92 @@ class modified_VelocytoLoom:
             density at each point of the grid
 
         """
-        delta_embedding = getattr(self.embeddings[embedding], f"delta_embedding")
-        emb = self.embeddings[embedding].embedding
-
-        if hasattr(self.embeddings[embedding], "corrcoef_random"):
-            delta_embedding_random = getattr(
-                self.embeddings[embedding],
-                f"delta_embedding_random",
+        for dataset_num in range(len(self.perturbed_X)):
+            delta_embedding = getattr(
+                self.embeddings[dataset_num][embedding],
+                f"delta_embedding",
             )
+            emb = self.embeddings[dataset_num][embedding].embedding
 
-        # Prepare the grid
-        grs = []
-        for dim_i in range(emb.shape[1]):
-            m, M = np.min(emb[:, dim_i]), np.max(emb[:, dim_i])
+            if hasattr(self.embeddings[dataset_num][embedding], "corrcoef_random"):
+                delta_embedding_random = getattr(
+                    self.embeddings[dataset_num][embedding],
+                    f"delta_embedding_random",
+                )
 
-            if xylim[dim_i][0] is not None:
-                m = xylim[dim_i][0]
-            if xylim[dim_i][1] is not None:
-                M = xylim[dim_i][1]
+            # Prepare the grid
+            grs = []
+            for dim_i in range(emb.shape[1]):
+                m, M = np.min(emb[:, dim_i]), np.max(emb[:, dim_i])
 
-            m = m - 0.025 * np.abs(M - m)
-            M = M + 0.025 * np.abs(M - m)
-            gr = np.linspace(m, M, steps[dim_i])
-            grs.append(gr)
+                if xylim[dim_i][0] is not None:
+                    m = xylim[dim_i][0]
+                if xylim[dim_i][1] is not None:
+                    M = xylim[dim_i][1]
 
-        meshes_tuple = np.meshgrid(*grs)
-        gridpoints_coordinates = np.vstack([i.flat for i in meshes_tuple]).T
+                m = m - 0.025 * np.abs(M - m)
+                M = M + 0.025 * np.abs(M - m)
+                gr = np.linspace(m, M, steps[dim_i])
+                grs.append(gr)
 
-        nn = NearestNeighbors(n_neighbors=n_neighbors, n_jobs=n_jobs)
-        nn.fit(emb)
-        dists, neighs = nn.kneighbors(gridpoints_coordinates)
+            meshes_tuple = np.meshgrid(*grs)
+            gridpoints_coordinates = np.vstack([i.flat for i in meshes_tuple]).T
 
-        std = np.mean([(g[1] - g[0]) for g in grs])
-        # isotropic gaussian kernel
-        gaussian_w = normal.pdf(loc=0, scale=smooth * std, x=dists)
-        self.embeddings[embedding].total_p_mass = gaussian_w.sum(1)
+            nn = NearestNeighbors(n_neighbors=n_neighbors, n_jobs=n_jobs)
+            nn.fit(emb)
+            dists, neighs = nn.kneighbors(gridpoints_coordinates)
 
-        UZ = (delta_embedding[neighs] * gaussian_w[:, :, None]).sum(1) / np.maximum(
-            1,
-            self.embeddings[embedding].total_p_mass,
-        )[
-            :,
-            None,
-        ]  # weighed average
-        magnitude = np.linalg.norm(UZ, axis=1)
-        # Assign attributes
-        self.embeddings[embedding].flow_embedding = emb
-        self.embeddings[embedding].flow_grid = gridpoints_coordinates
-        self.embeddings[embedding].flow = UZ
-        self.embeddings[embedding].flow_norm = UZ / np.percentile(magnitude, 99.5)
-        self.embeddings[embedding].flow_norm_magnitude = np.linalg.norm(
-            self.embeddings[embedding].flow_norm,
-            axis=1,
-        )
+            std = np.mean([(g[1] - g[0]) for g in grs])
+            # isotropic gaussian kernel
+            gaussian_w = normal.pdf(loc=0, scale=smooth * std, x=dists)
+            self.embeddings[dataset_num][embedding].total_p_mass = gaussian_w.sum(1)
 
-        if hasattr(self.embeddings[embedding], "corrcoef_random"):
-            UZ_rndm = (delta_embedding_random[neighs] * gaussian_w[:, :, None]).sum(
+            UZ = (delta_embedding[neighs] * gaussian_w[:, :, None]).sum(1) / np.maximum(
                 1,
-            ) / np.maximum(1, self.embeddings[embedding].total_p_mass)[
+                self.embeddings[dataset_num][embedding].total_p_mass,
+            )[
                 :,
                 None,
             ]  # weighed average
-            magnitude_rndm = np.linalg.norm(UZ, axis=1)
+            magnitude = np.linalg.norm(UZ, axis=1)
             # Assign attributes
-            self.embeddings[embedding].flow_rndm = UZ_rndm
-            self.embeddings[embedding].flow_norm_rndm = UZ_rndm / np.percentile(
-                magnitude_rndm,
+            self.embeddings[dataset_num][embedding].flow_embedding = emb
+            self.embeddings[dataset_num][embedding].flow_grid = gridpoints_coordinates
+            self.embeddings[dataset_num][embedding].flow = UZ
+            self.embeddings[dataset_num][embedding].flow_norm = UZ / np.percentile(
+                magnitude,
                 99.5,
             )
-            self.embeddings[embedding].flow_norm_magnitude_rndm = np.linalg.norm(
-                self.embeddings[embedding].flow_norm_rndm,
-                axis=1,
+            self.embeddings[dataset_num][embedding].flow_norm_magnitude = (
+                np.linalg.norm(
+                    self.embeddings[dataset_num][embedding].flow_norm,
+                    axis=1,
+                )
             )
+
+            if hasattr(self.embeddings[dataset_num][embedding], "corrcoef_random"):
+                UZ_rndm = (delta_embedding_random[neighs] * gaussian_w[:, :, None]).sum(
+                    1,
+                ) / np.maximum(1, self.embeddings[dataset_num][embedding].total_p_mass)[
+                    :,
+                    None,
+                ]  # weighed average
+                magnitude_rndm = np.linalg.norm(UZ, axis=1)
+                # Assign attributes
+                self.embeddings[dataset_num][embedding].flow_rndm = UZ_rndm
+                self.embeddings[dataset_num][embedding].flow_norm_rndm = (
+                    UZ_rndm
+                    / np.percentile(
+                        magnitude_rndm,
+                        99.5,
+                    )
+                )
+                self.embeddings[dataset_num][embedding].flow_norm_magnitude_rndm = (
+                    np.linalg.norm(
+                        self.embeddings[dataset_num][embedding].flow_norm_rndm,
+                        axis=1,
+                    )
+                )
 
     '''
     def prepare_markov(
