@@ -8,6 +8,13 @@ from sklearn.linear_model import Ridge
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.preprocessing import PolynomialFeatures
 
+"""
+    ###############################################################################################
+    ###  These functions were taken from CellOracle (https://github.com/morris-lab/CellOracle)  ###
+    ###  and modified for our use                                                               ###
+    ###############################################################################################
+"""
+
 
 def scatter_value_to_grid_value(
     embedding,

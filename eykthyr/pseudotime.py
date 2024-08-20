@@ -46,6 +46,13 @@ def load_gradient(file_path):
 
 
 class Gradient_calculator:
+    """
+    ########################################################################################
+    ###  This class is taken from CellOracle (https://github.com/morris-lab/CellOracle)  ###
+    ###  and modified for our use                                                        ###
+    ########################################################################################
+    """
+
     def __init__(
         self,
         adata=None,

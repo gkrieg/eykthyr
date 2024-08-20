@@ -10,6 +10,13 @@ import pandas as pd
 
 class Data_strage:
     """
+    ##########################################################################################
+    ###  This class was taken from CellOracle (https://github.com/morris-lab/CellOracle)   ###
+    ###  and modified for our use                                                          ###
+    ##########################################################################################
+    """
+
+    """
     Custom class for quick save and load.
     Attributes can be easily and quickly saved and loaded with hdf5 file.
     Supported attribute types: [int, float, str, list(of int, float, str), np.ndarray (or int, float, str), pd.Dataframe]

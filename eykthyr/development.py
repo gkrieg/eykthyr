@@ -40,6 +40,12 @@ from .util import CONFIG
 
 
 class Pseudotime_module(Data_strage):
+    """
+    ##########################################################################################
+    ###  This class was taken from CellOracle (https://github.com/morris-lab/CellOracle)   ###
+    ###  and modified for our use                                                          ###
+    ##########################################################################################
+    """
 
     def __init__(self, embedding_object=None, gradient_object=None, name=None):
         super().__init__()
