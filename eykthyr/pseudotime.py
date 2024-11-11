@@ -27,23 +27,6 @@ from .plotting_utils import (
 from .scatter_to_grid import scatter_value_to_grid_value
 from .util import CONFIG
 
-# from ..utility.hdf5_processing import dump_hdf5, load_hdf5
-
-'''
-def load_gradient(file_path):
-
-    """
-    Load gradient object saved as hdf5 file.
-
-    Args:
-        file_path (str): File path to the hdf5 file.
-    """
-    obj = load_hdf5(filename=file_path, obj_class=Gradient_calculator, ignore_attrs_if_err=[])
-
-
-    return obj
-'''
-
 
 class Gradient_calculator:
     """
@@ -104,26 +87,6 @@ class Gradient_calculator:
     def copy(self):
         """Deepcopy itself."""
         return deepcopy(self)
-
-    '''
-    def to_hdf5(self, file_path):
-        """
-        Save object as hdf5.
-
-        Args:
-            file_path (str): file path to save file. Filename needs to end with '.celloracle.oracle'
-        """
-        if file_path.endswith(".celloracle.gradient"):
-            pass
-        else:
-            raise ValueError("Filename needs to end with '.celloracle.gradient'")
-
-        compression_opts = 5
-        dump_hdf5(obj=self, filename=file_path,
-                  data_compression=compression_opts,  chunks=(2048, 2048),
-                  noarray_compression=compression_opts, pickle_protocol=4)
-
-    '''
 
     def load_adata(
         self,
