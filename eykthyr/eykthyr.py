@@ -256,7 +256,6 @@ class Eykthyr(modified_VelocytoLoom):
 
             archr_name_len = len(archr_dataset_name) + 1
             tfpeaks = pd.read_csv(peak_tsv, sep=" ")
-            # new_col_names = [c[archr_name_len:-2] for c in tfpeaks.columns]
             new_col_names = [
                 f"{c[archr_name_len:-2]}{archr_suffix}" for c in tfpeaks.columns
             ]
@@ -384,11 +383,6 @@ class Eykthyr(modified_VelocytoLoom):
             K=self.num_metagenes,
             useX=True,
         )
-        # self.perturbed_X = [sc.AnnData(
-        #     X=popdata.obsm["X"],
-        #     obs=popdata.obs,
-        #     obsm=popdata.obsm,
-        # ) for popdata in self.popari.datasets]
 
 
 def load_anndata(dirpath: str) -> Eykthyr:

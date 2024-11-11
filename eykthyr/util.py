@@ -208,9 +208,6 @@ def get_edges_window(ad_ex, ad_motif, target_gene, grn, ad_pop, num_hops=1):
 
 
 def get_neighbors(ad_pop, i, nn_indices, cell_type, cluster_id, num_within, num_total):
-    # we would like to get a list of cells within cell type and outside cell type ordered by distance
-    # We should only do the distance calculations once
-    # We could probably use scipy knn for this, then split the list by same or different cell type
     cell_indices = nn_indices[i]
     within_cluster_indices = [
         ind
@@ -387,8 +384,6 @@ def align_leiden(d, tf):
     # Can use the scipy algorithm for linear_sum_assignment()
     from scipy.optimize import linear_sum_assignment
 
-    # build the cost matrix
-    # The issue is when there are more new clusters than there are old clusters. We need to stop this from happening in the function above
     cost_matrix = np.zeros(
         (len(d.obs["original_leiden"].unique()), len(d.obs["leiden"].unique())),
     )

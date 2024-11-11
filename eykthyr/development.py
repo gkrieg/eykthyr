@@ -81,7 +81,7 @@ class Pseudotime_module(Data_strage):
         self._load_hdf5(place=f"{gene}/{misc}", specify_attributes=specify_attributes)
 
     def del_attrs(self, exemptions=[]):
-        # Delete all attributes
+
         self._del_attrs(exemptions=exemptions)
 
     def get_hdf5_info(self):
@@ -181,8 +181,6 @@ class Pseudotime_module(Data_strage):
         x_max, y_max = self.embedding.max(axis=0)
         xylim = ((x_min, x_max), (y_min, y_max))
 
-        # embedding_object_.calculate_grid_arrows(smooth=smooth, steps=(self.n_grid, self.n_grid), n_neighbors=n_neighbors, xylim=xylim)
-
         # 3. Store result of grid calculation
         for i in ["flow", "flow_rndm"]:
             setattr(self, i, getattr(embedding_object_, i))
@@ -197,7 +195,6 @@ class Pseudotime_module(Data_strage):
 
     def calculate_inner_product(self):
 
-        # Calculate inner product between the pseudotime-gradient and the perturb-gradient
         self.inner_product = np.array(
             [np.dot(i, j) for i, j in zip(self.flow, self.ref_flow)],
         )

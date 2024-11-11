@@ -14,14 +14,11 @@ class Data_strage:
     ###  This class was taken from CellOracle (https://github.com/morris-lab/CellOracle)   ###
     ###  and modified for our use                                                          ###
     ##########################################################################################
-    """
 
-    """
-    Custom class for quick save and load.
-    Attributes can be easily and quickly saved and loaded with hdf5 file.
+    Custom class for quick save and load with hdf5 file.
     Supported attribute types: [int, float, str, list(of int, float, str), np.ndarray (or int, float, str), pd.Dataframe]
 
-    1. If an attribute is stored as an unsupperted type, it will be ignored.
+    1. If an attribute is stored as an unsupported type, it will be ignored.
     2. If an attribute name starts with "_", it will be ignored.
     """
 
@@ -129,7 +126,7 @@ class Data_strage:
     def _save_attrs_df(self, place, attributes):
         """
         Args:
-            place (str): Directry in hdf5 file.
+            place (str): Directory in hdf5 file.
             attributes (list of str): attributes to save.
         """
         for i, j in enumerate(attributes):
@@ -140,7 +137,7 @@ class Data_strage:
     def _load_attrs_df(self, place, attributes):
         """
         Args:
-            place (str): Directry in hdf5 file.
+            place (str): Directory in hdf5 file.
             attributes (list of str): attributes to load.
         """
         for i, j in enumerate(attributes):
