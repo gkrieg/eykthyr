@@ -5,7 +5,7 @@
 EYKTHYR is the first method developed to infer region-specific TF influences on spatial gene programs (or metagenes) using spatial multiome data. EYKTHYR addresses high technical dropout by introducing a novel combination of linear embeddings for gene expression and chromatin accessibility, denoising the data while maintaining interpretability, as shifts in metagene embeddings map directly back to input gene expression. Using information from spatially proximal neighbors, EYKTHYR learns a linear relationship between TF activity and metagene expression in each cell, where these two layers of linear mappings—from TF activity to metagenes, and from metagenes to gene expression—enable reasoning about how TF activity changes affect gene expression.
 
 # Running EYKTHYR
-# Input Data Format
+## Input Data Format
 
 EYKTHYR requires spatial transcriptomics and spatial chromatin accessibility data to be provided as AnnData objects, structured as follows:
 
@@ -21,9 +21,9 @@ While not required, any additional metadata (e.g., cell types, batch labels) can
 Chromatin accessibility data:
 Chromatin accessibility data can be in the form of a fragments file, where each fragment corresponds to a cell, using the same cell ids as in the gene expression data.
 
-# Installation
+## Installation
 
-## Step 1: Create a Conda Environment
+### Step 1: Create a Conda Environment
 
 Before installing any Python packages, we strongly recommend using Anaconda (please refer to the Anaconda webpage for conda installation instructions) to create a python 3.10 environment using the following command:
 
@@ -33,7 +33,7 @@ After creating the environment, activate it using:
 
 conda activate eykthyr
 
-## Step 2: Install Dependencies
+### Step 2: Install Dependencies
 
 Install PyTorch with CUDA (optional)
 
@@ -43,13 +43,13 @@ conda install pytorch==2.1.0 cudatoolkit=11.8 -c pytorch
 
 Note: For a CPU-only installation, you can omit the cudatoolkit argument.
 
-## Step 3: Install EYKTHYR
+### Step 3: Install EYKTHYR
 
 EYKTHYR is available as a pypi package, and can be installed using:
 
 pip install eykthyr
 
-# Running Code
+## Running Code
 
 To run our method, you need to run the pipeline in two parts: first process the spatial ATAC-seq data into a peak matrix, and create a file that annotates peaks with TF motifs present in the peak region. The second part of the pipeline preprocesses the spatial transcriptomic data and then combines this with the TF activity for inference.
 
