@@ -65,6 +65,6 @@ remove_from_toctrees = ["api/*"]
 # -- Executable Book Theme options
 html_theme_options = {
     "show_navbar_depth": 1,
-    "repository_url": "https://github.com/alam-shahul/popari",
+    "repository_url": "https://github.com/gkrieg/eykthyr",
     "use_repository_button": True,
 }
