@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "numpy>=1.20.1"]
 build-backend = "hatchling.build"
 
 [project]
