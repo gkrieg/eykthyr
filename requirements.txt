@@ -1,3 +1,4 @@
 myst-nb
 sphinx_copybutton
 sphinx_remove_toctrees
+sphinx_book_theme
