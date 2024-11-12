@@ -3,6 +3,8 @@
 ```{toctree}
 
 quickstart
-tutorial_gallery/eykthyr_tests
+tutorial_gallery/atac_preprocess
+tutorial_gallery/rna_preprocess
+tutorial_gallery/training_analysis
 
 ```
