@@ -25,6 +25,8 @@ python:
   install:
     - requirements: requirements.txt
     - method: pip
+      path: .
+    - method: pip
       path: .[with_velocyto]
 # Optionally build your docs in additional formats such as PDF and ePub
 # formats:
