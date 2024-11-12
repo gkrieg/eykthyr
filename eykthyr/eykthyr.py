@@ -52,7 +52,17 @@ class Eykthyr(modified_VelocytoLoom):
         make_plots: bool = False,
         cluster_annotation: Optional[Sequence[str]] = [],
     ):
-        """"""
+        """Preprocesses RNA data by filtering genes and cells, normalizing, and
+        log-transforming data.
+
+        Parameters:
+            make_plots (bool): If True, performs PCA, neighbors, UMAP, and Leiden clustering for visualization.
+            cluster_annotation (Optional[Sequence[str]]): Optional list of cluster annotations to use for visualization.
+
+        Returns:
+            None
+
+        """
         for RNA in self.RNA:
             if self.rna_preprocessed:
                 print("RNA appears to already be preprocessed, doing nothing")
@@ -89,7 +99,20 @@ class Eykthyr(modified_VelocytoLoom):
         initial_iterations: int = 10,
         spatial_iterations: int = 200,
     ):
-        """"""
+        """Computes metagenes using the Popari model with specified initial and
+        spatial iterations.
+
+        Parameters:
+            K (int): Number of metagenes to compute.
+            lambda_Sigma_x_inv (float): Regularization parameter for the Popari model.
+            torch_context (dict): Device and data type for torch operations.
+            initial_iterations (int): Number of initial iterations without spatial affinities.
+            spatial_iterations (int): Number of iterations with spatial affinities.
+
+        Returns:
+            None
+
+        """
         if not self.rna_preprocessed:
             print(
                 "RNA appears to not be preprocessed. Please preprocess RNA using Eykthyr.preprocess_rna() or set Eykthyr.rna_preprocessed = True",
@@ -135,7 +158,16 @@ class Eykthyr(modified_VelocytoLoom):
         self,
         num_leiden_clusters: int = 10,
     ):
-        """"""
+        """Analyzes computed metagenes by performing Leiden clustering and UMAP
+        visualization of embeddings.
+
+        Parameters:
+            num_leiden_clusters (int): Target number of clusters for Leiden clustering.
+
+        Returns:
+            None
+
+        """
         if not self.popari:
             print("Popari has not been run. Please run compute_metagenes() first.")
             return
@@ -160,7 +192,16 @@ class Eykthyr(modified_VelocytoLoom):
         self,
         dirpath: str,
     ):
-        """"""
+        """Saves RNA, TF, edge weights, and perturbed_X AnnData objects to a
+        specified directory.
+
+        Parameters:
+            dirpath (str): Path to the directory where AnnData objects will be saved.
+
+        Returns:
+            None
+
+        """
         dirpath = Path(dirpath)
         path_without_extension = dirpath.parent / dirpath.stem
         path_without_extension.mkdir(exist_ok=True)
@@ -192,35 +233,76 @@ class Eykthyr(modified_VelocytoLoom):
         self,
         RNA: List[sc.AnnData],
     ):
-        """"""
+        """Sets the RNA datasets for the Eykthyr instance.
+
+        Parameters:
+            RNA (List[sc.AnnData]): List of RNA AnnData objects to assign to the instance.
+
+        Returns:
+            None
+
+        """
         self.RNA = RNA
 
     def set_popari(
         self,
         popari: Popari,
     ):
-        """"""
+        """Sets the Popari model instance for Eykthyr.
+
+        Parameters:
+            popari (Popari): A Popari model instance to use for metagene computation.
+
+        Returns:
+            None
+
+        """
         self.popari = popari
 
     def set_TF(
         self,
         TF: List[sc.AnnData],
     ):
-        """"""
+        """Sets the transcription factor (TF) activity datasets for Eykthyr.
+
+        Parameters:
+            TF (List[sc.AnnData]): List of AnnData objects with TF activity data.
+
+        Returns:
+            None
+
+        """
         self.TF = TF
 
     def set_edge_weights(
         self,
         edge_weights: List[sc.AnnData],
     ):
-        """"""
+        """Sets the edge weights datasets for gene regulatory network analysis
+        in Eykthyr.
+
+        Parameters:
+            edge_weights (List[sc.AnnData]): List of AnnData objects representing GRN edge weights.
+
+        Returns:
+            None
+
+        """
         self.edge_weights = edge_weights
 
     def set_perturbed_X(
         self,
         perturbed_X: List[sc.AnnData],
     ):
-        """"""
+        """Sets the perturbed gene expression datasets for Eykthyr.
+
+        Parameters:
+            perturbed_X (List[sc.AnnData]): List of AnnData objects with perturbed gene expression data.
+
+        Returns:
+            None
+
+        """
         self.perturbed_X = perturbed_X
 
     # Adjust the rest of the methods similarly
@@ -310,7 +392,16 @@ class Eykthyr(modified_VelocytoLoom):
         self,
         num_hops: int = 2,
     ):
-        """"""
+        """Computes the edge weights between transcription factors and metagenes
+        over spatial neighborhoods.
+
+        Parameters:
+            num_hops (int): Number of spatial hops for computing metagene edges in the regulatory network.
+
+        Returns:
+            None
+
+        """
 
         if not self.popari or not self.TF:
             print(
@@ -355,7 +446,16 @@ class Eykthyr(modified_VelocytoLoom):
     def run_all_perturbations(
         self,
     ):
-        """"""
+        """Runs all perturbation analyses based on computed TF activity and edge
+        weights.
+
+        Parameters:
+            None
+
+        Returns:
+            None
+
+        """
 
         if not self.popari:
             print("Popari needs to be run first, please run compute_metagenes().")
