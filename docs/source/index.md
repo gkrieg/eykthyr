@@ -1,5 +1,3 @@
-# eykthyr
-
 ```{include} intro.md
 ```
 

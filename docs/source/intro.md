@@ -1,4 +1,4 @@
-# Overview of EYKTHYR
+# Overview
 
 EYKTHYR is the first method developed to infer region-specific TF influences on spatial gene programs (or metagenes) using spatial multiome data. EYKTHYR addresses high technical dropout by introducing a novel combination of linear embeddings for gene expression and chromatin accessibility, denoising the data while maintaining interpretability, as shifts in metagene embeddings map directly back to input gene expression. Using information from spatially proximal neighbors, EYKTHYR learns a linear relationship between TF activity and metagene expression in each cell, where these two layers of linear mappings—from TF activity to metagenes, and from metagenes to gene expression—enable reasoning about how TF activity changes affect gene expression.
 
