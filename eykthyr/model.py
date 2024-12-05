@@ -93,11 +93,12 @@ class Eykthyr(modified_VelocytoLoom):
 
     def compute_metagenes(
         self,
-        K: int = 16,
-        lambda_Sigma_x_inv: float = 1e-4,
-        torch_context: dict = dict(device="cuda:0", dtype=torch.float64),
+        # K: int = 16,
+        # lambda_Sigma_x_inv: float = 1e-4,
+        # torch_context: dict = dict(device="cuda:0", dtype=torch.float64),
         initial_iterations: int = 10,
         spatial_iterations: int = 200,
+        **popari_hyperparameters,
     ):
         """Computes metagenes using the Popari model with specified initial and
         spatial iterations.
@@ -124,7 +125,7 @@ class Eykthyr(modified_VelocytoLoom):
         for RNA, name in zip(self.RNA, self.datasetnames):
             popari_d = PopariDataset(RNA, name)
             popari_d.compute_spatial_neighbors()
-            RNA.obs["adjacency_list"] = popari_d.obs["adjacency_list"]
+            RNA.obsm["adjacency_list"] = popari_d.obsm["adjacency_list"]
             RNA.obsp["adjacency_matrix"] = popari_d.obsp["adjacency_matrix"]
             if isinstance(RNA.X, spmatrix):
                 RNA.X = RNA.X.todense()
@@ -137,13 +138,9 @@ class Eykthyr(modified_VelocytoLoom):
             popari_datasets.append(altRNA)
         print(popari_datasets)
         self.popari = Popari(
-            K=K,
             replicate_names=self.datasetnames,
             datasets=popari_datasets,
-            lambda_Sigma_x_inv=lambda_Sigma_x_inv,
-            torch_context=torch_context,
-            initial_context=torch_context,
-            verbose=0,
+            **popari_hyperparameters
         )
 
         for iteration in range(initial_iterations):
@@ -211,8 +208,8 @@ class Eykthyr(modified_VelocytoLoom):
             RNA.uns["rna_preprocessed"] = self.rna_preprocessed
             RNA.uns["cluster_annotation"] = self.cluster_annotation
             RNA.uns["num_metagenes"] = self.num_metagenes
-            if "adjacency_list" in RNA.obs.columns:
-                del RNA.obs["adjacency_list"]
+            if "adjacency_list" in RNA.obsm:
+                del RNA.obsm["adjacency_list"]
             RNA.write(f"{path_without_extension}/RNA_{i}.h5ad")
 
         if self.popari and not os.path.isfile(f"{path_without_extension}/popari.h5ad"):
@@ -225,8 +222,8 @@ class Eykthyr(modified_VelocytoLoom):
             edge_weight.write(f"{path_without_extension}/edge_weights_{i}.h5ad")
 
         for i, perturbed_X in enumerate(self.perturbed_X):
-            if "adjacency_list" in perturbed_X.obs.columns:
-                del perturbed_X.obs["adjacency_list"]
+            if "adjacency_list" in perturbed_X.obsm:
+                del perturbed_X.obsm["adjacency_list"]
             perturbed_X.write(f"{path_without_extension}/perturbed_X_{i}.h5ad")
 
     def set_RNA(
